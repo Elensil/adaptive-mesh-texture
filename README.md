@@ -16,9 +16,9 @@ Please, bear in mind this is a research project, and we are currently working on
 
 ## Structure
 
-- The [MeshTexture](https://gitlab.inria.fr/marmando/adaptive-mesh-texture/MeshTexture) folder contains the main C++ project, used to generate, manipulate, compress/uncompress textured meshes.
-- The [Eval](https://gitlab.inria.fr/marmando/adaptive-mesh-texture/Eval) folder contains Matlab code to compute similarity scores between textured models and input images.
-- The [Rendering](https://gitlab.inria.fr/marmando/adaptive-mesh-texture/Rendering) folder contains ressources for displaying textured models.
+- The [MeshTexture](https://gitlab.inria.fr/marmando/adaptive-mesh-texture/tree/master/MeshTexture) folder contains the main C++ project, used to generate, manipulate, compress/uncompress textured meshes.
+- The [Eval](https://gitlab.inria.fr/marmando/adaptive-mesh-texture/tree/master/Eval) folder contains Matlab code to compute similarity scores between textured models and input images.
+- The [Rendering](https://gitlab.inria.fr/marmando/adaptive-mesh-texture/tree/master/Rendering) folder contains ressources for displaying textured models.
 
 
 ## Citation
