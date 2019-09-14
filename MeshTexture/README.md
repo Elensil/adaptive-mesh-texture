@@ -2,9 +2,14 @@
 
 Here is the core of the project.
 
-##Documentation
+## Documentation
 
 ### Prerequisites
+
+- OpenCV version 3.1
+- Eigen3
+
+Detailled instructions will follow soon.
 
 ### Installation
 
