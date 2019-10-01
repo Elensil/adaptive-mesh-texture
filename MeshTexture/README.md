@@ -6,6 +6,7 @@ Here is the core of the project.
 
 ### Prerequisites
 
+- CMake
 - OpenCV version 3.1
 - Eigen3
 
