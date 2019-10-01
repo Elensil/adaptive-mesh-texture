@@ -13,7 +13,21 @@ Detailled instructions will follow soon.
 
 ### Installation
 
+	# Clone and compile
+	git clone https://gitlab.inria.fr/marmando/adaptive-mesh-texture.git
+	cd adaptive-mesh-texture
+	mkdir build
+	cd build
+	cmake . ../MeshTexture
+	make -j
+
+
+
+
 ### Execution
+
+
+
 
 #### Parameters settings:
 
