@@ -1126,7 +1126,7 @@ void MeshEncoder::encodeQuantizationMatrix(BitArray &bitStream, std::vector<floa
 
 void MeshEncoder::encodeEigenVectors(BitArray &bitStream, cv::Mat &eigenVectors, int vectorsNumber, int vNumber = 0)
 {
-    int bitPrecision=16;
+    int bitPrecision=QUANT_BITS;
     int segmentLength = int(ceil(eigenVectors.cols * vectorsNumber * (float(bitPrecision)/8) + 2 + 1)+0.1);  //+ 2 for size bytes, +1 for matrix info
     
     log(ALWAYS)<<"Encoding eigen vectors:"<<endLog();

@@ -19,6 +19,14 @@ MySpecialMesh::MySpecialMesh(long int frame, std::string filename):active_frame_
                 log(ERROR)<<"[Mesh OBJ loader] Error: Could not load OBJ file."<<endLog();
             }
         }
+        else if(!format.compare("moff"))
+        {
+            if(!loadMOFF(filename))
+            {
+                
+                log(ERROR)<<"[Mesh OFF loader] Error: Could not load MOFF file."<<endLog();
+            }
+        }
         else if(!format.compare("off"))
         {
             if(!loadMOFF(filename))
@@ -33,7 +41,7 @@ MySpecialMesh::MySpecialMesh(long int frame, std::string filename):active_frame_
         {
             if(!loadZOFF(filename))
             {
-                log(ERROR)<<"[Mesh OFF loader] Error: Could not load OFF file."<<endLog();
+                log(ERROR)<<"[Mesh OFF loader] Error: Could not load ZOFF file."<<endLog();
             }
         }
 
@@ -1007,7 +1015,12 @@ void MySpecialMesh::exportAsZOFF(std::string filename) const{
 }
 
 void MySpecialMesh::exportAsMOFF(std::string filename) const{
-	std::string rootname = filename.substr(0,filename.length()-4);
+	
+    // std::string rootname = filename.substr(0,filename.length()-4);
+    std::string rootname;
+    std::size_t lastDot = filename.rfind(".");
+    if (lastDot!=std::string::npos)
+        rootname = filename.substr(0,lastDot);
 
 	std::string pngfilename = rootname + ".png";
     std::string pngfilenamePath = rootname + ".png";

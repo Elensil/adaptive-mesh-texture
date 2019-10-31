@@ -29,11 +29,6 @@
 enum SamplerMode{UNDEFINED,StaticMode,DynamicMode,CleaningMode};
 enum ImplicitFunctionMode{VisualHullMode,DepthMapMode};
 
-
-
-//Camera removal threshold
-static const float CAMERA_SIZE = CAMERA_REMOVAL_SIZE;
-
 class SpaceTimeSampler{
 
     /* This class is quite the core of the whole 4D Reconstruction pipeline
@@ -141,7 +136,7 @@ public:
 
 
     template<class InTriangle = MyTriangle, class InPoint = Vector3f, class InColor = Vector3ui, class MySpecialMesh>
-    void reIndexColors(MySpecialMesh *in_mesh, int default_face_res, int quantFactor, float quantMatCoefs[], int downsamplingThreshold)const;
+    void reIndexColors(MySpecialMesh *in_mesh, int default_face_res, float quantMatCoefs[], int downsamplingThreshold)const;
 
     template<class InTriangle = MyTriangle, class InPoint = Vector3f, class InColor = Vector3ui, class MySpecialMesh>
     void compressColor(MySpecialMesh *in_mesh, std::vector<size_t> &in_edge_indices, int default_face_res, int quantFactor, float quantMatCoefs[], int downsamplingThreshold)const;
@@ -276,16 +271,13 @@ void SpaceTimeSampler::colorPointCloud( MySpecialMesh *in_mesh,
     std::string outputPath = output_folder_;
     
     // --- CONSTANTS definitions ---
-    unsigned short default_face_res=8;         //maximum face resolution
-    int vote_pixel_radius = 0;                  //When projecting votes, project on neighbouring triangles as well, with this radius.
-                                                //TODO: replace this by saving spatial coordinates (or ray) of votes, and looping through votes of neighbours (for SR)
+    unsigned short default_face_res=MAX_FACE_RES;           //maximum face resolution
+    int vote_pixel_radius = VOTE_PIXEL_RADIUS;              //When projecting votes, project on neighbouring triangles as well, with this radius.
+                                                            //TODO: replace this by saving spatial coordinates (or ray) of votes, and looping through votes of neighbours (for SR)
     
-    int OUT_OF_CAMERA_NUMBER = 1;               //First, select this number of camera for each vertex. Then, remove less consensual camera one by one, until you're left with CAMERA_NUMBER cameras.
-    int CAMERA_NUMBER=1;                        //number of cameras voting for each vertex
-
     bool bInputDownsampled = false;
-    int projection_margin_radius = 10;               
-    double projection_margin_depth_threshold = 0.03;
+    int projection_margin_radius = PROJ_MARGIN_RADIUS;               
+    double projection_margin_depth_threshold = PROJ_MARGIN_DEPTH_TH;
 
     unsigned int texRes;                 //For filling in texture map: texture resolution (square)
 
@@ -1567,7 +1559,7 @@ void SpaceTimeSampler::colorPointCloud( MySpecialMesh *in_mesh,
     // **********************************
     float quantMatCoefs[] = {1,0.1,0.01};
     
-    reIndexColors(in_mesh, default_face_res, 2048, quantMatCoefs, downsamplingThreshold);
+    reIndexColors(in_mesh, default_face_res, quantMatCoefs, downsamplingThreshold);
     
     //The following lines is a necessary if reIndexColors is not run (I think?)
     // out_edge_color_ind=temp_edge_color_ind;
@@ -1630,8 +1622,8 @@ void SpaceTimeSampler::colorInput( MySpecialMesh *in_mesh,
     int vote_pixel_radius = 0;                  //When projecting votes, project on neighbouring triangles as well, with this radius.
                                                 //TODO: replace this by saving spatial coordinates (or ray) of votes, and looping through votes of neighbours (for SR)
     
-    int OUT_OF_CAMERA_NUMBER = 5;               //First, select this number of camera for each vertex. Then, remove less consensual camera one by one, until you're left with CAMERA_NUMBER cameras.
-    int CAMERA_NUMBER=5;                        //number of cameras voting for each vertex
+    // int OUT_OF_CAMERA_NUMBER = 5;               //First, select this number of camera for each vertex. Then, remove less consensual camera one by one, until you're left with CAMERA_NUMBER cameras.
+    // int CAMERA_NUMBER=5;                        //number of cameras voting for each vertex
 
     int projection_margin_radius = 10;               
     double projection_margin_depth_threshold = 0.03;
@@ -4412,9 +4404,7 @@ void SpaceTimeSampler::setPixelsWhereTrianglesProjectCloserWConfidence(const std
 
 template<class InTriangle, class InPoint, class InColor, class MySpecialMesh>
 void SpaceTimeSampler::reIndexColors(   MySpecialMesh *in_mesh,
-                                        //std::vector<size_t> &in_edge_indices,
                                         int default_face_res,
-                                        int quantFactor,
                                         float quantMatCoefs[],
                                         int downsamplingThreshold
                                     )const
@@ -4779,9 +4769,6 @@ void SpaceTimeSampler::compressColor(   MySpecialMesh *in_mesh,
 
     std::string outputPath = output_folder_;
     std::ofstream fout(outputPath+"samplingLogFilevul", std::ios::app);
-
-    int quantBits = 16;
-
     // //computing temp edge vector
     // std::vector<Vector3li> temp_edge_color_ind(in_edge_color_ind.size());
     // log(ALWAYS)<<"in_faces size = "<<in_faces.size()<<endLog();
@@ -4973,7 +4960,7 @@ void SpaceTimeSampler::compressColor(   MySpecialMesh *in_mesh,
 
         eigenVec.push_back(pca.eigenvectors);
 
-        resEigenVecList[targetRes] = ((std::pow(2,quantBits-1)-1)*eigenVec);        //puts everything in the coding range ([-32768,32767] by default, if quantBits=16, to be coded on two bytes)
+        resEigenVecList[targetRes] = ((std::pow(2,QUANT_BITS-1)-1)*eigenVec);        //puts everything in the coding range ([-32768,32767] by default, if QUANT_BITS=16, to be coded on two bytes)
 
         quantMultipliers[targetRes] = quantMultiplier;
         log(ALWAYS)<<"quantFactor = "<<quantFactor<<endLog();
@@ -5125,8 +5112,6 @@ void SpaceTimeSampler::decodeCompressedColor(   MySpecialMesh *in_mesh,
 
     std::vector<int32_t> triverts(3);
 
-    int quantBits = 16;
-
     bool processFullTri = true;
     int samplesNumber, chromaSamplesNumber;
     int minIndex, maxIndex, triLength, chromaTriLength;
@@ -5196,7 +5181,7 @@ void SpaceTimeSampler::decodeCompressedColor(   MySpecialMesh *in_mesh,
 
         cv::Mat newEigenVectors;
 
-        resEigenVecList[targetRes].convertTo(newEigenVectors, CV_32FC1, 1/(std::pow(2,quantBits-1)-1));
+        resEigenVecList[targetRes].convertTo(newEigenVectors, CV_32FC1, 1/(std::pow(2,QUANT_BITS-1)-1));
         
         cv::Mat pcaMeanVector = newEigenVectors.row(0);     //mean vector is stored as the 1st row
         newEigenVectors = newEigenVectors.rowRange(1,newEigenVectors.rows);

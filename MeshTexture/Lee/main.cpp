@@ -9,15 +9,7 @@
 
 #include "mesh.h"
 
-///TBD: set this as a parameter?
 std::string output_name_format;
-
-
-// void removeDupliVertexCloseHolesAndSmooth(const std::string &input_name, const std::string &output_name){
-//     log(ALWAYS) << "[Main] : Removing Duplicated Vertices, Closing holes and Smoothing..." <<endLog();
-//     system(std::string("meshlabserver -i "+input_name+" -o "+output_name+" -s ./clean_HC_LaplacianSmoothing.mlx -om vc").c_str());
-// }
-
 
 int main(int argc, char **argv)
 {
@@ -78,7 +70,7 @@ int main(int argc, char **argv)
                 {
                     dst = dstValues[dstInd];
                     // std::string colored_output_name = (boost::format(output_name_format+std::to_string(fr)+"_"+std::to_string(dst)+".off") % hyper_volume->getFrameNumber(frame)).str();
-                    std::string colored_output_name = (boost::format(output_name_format+"off") % hyper_volume->getFrameNumber(frame)).str();
+                    std::string colored_output_name = (boost::format(output_name_format+"moff") % hyper_volume->getFrameNumber(frame)).str();
             
 
                     // if (boost::filesystem::exists(colored_output_name))
@@ -148,7 +140,7 @@ int main(int argc, char **argv)
                         MySpecialMesh mesh_to_be_cleaned(hyper_volume->getFrameNumber(frame),input_name);
                         log(ALWAYS)<<"mesh loaded."<<endLog();
                         //std::string compressed_output_name = (boost::format(output_name_format+"comp_"+std::to_string(quantFactor)+"_"+std::to_string(10*quantMatCoefs[1])+"_"+std::to_string(100*quantMatCoefs[2])+".off") % hyper_volume->getFrameNumber(frame)).str();
-                        std::string compressed_output_name = (boost::format(output_name_format+"comp0m_%i_%.1f_%.1f.off") % hyper_volume->getFrameNumber(frame) % quantFactor % (10*quantMatCoefs[1]) %  (100*quantMatCoefs[2])).str();
+                        std::string compressed_output_name = (boost::format(output_name_format+"comp0m_%i_%.1f_%.1f.moff") % hyper_volume->getFrameNumber(frame) % quantFactor % (10*quantMatCoefs[1]) %  (100*quantMatCoefs[2])).str();
                         mesh_to_be_cleaned.uncompressColoredMesh(hyper_volume,quantFactor,quantMatCoefs);
                         mesh_to_be_cleaned.exportAsMOFF(compressed_output_name);
                     }

@@ -43,13 +43,26 @@ typedef glm::dmat3x3 GLM_Mat3;
 typedef glm::dvec3   GLM_Vec3;
 typedef glm::dvec4   GLM_Vec4;
 
-#define EROSION_SIZE 15 //8 ; 20 doorway
-#define CAMERA_REMOVAL_SIZE 2.0
-
 
 #define IMG_WIDTH 2048
 #define IMG_HEIGHT 2048
 #define CLEANING_FACTOR 3.0
+
+// --- Coloring parameters ---
+
+#define OUT_OF_CAMERA_NUMBER 1 					//First, select this number of camera for each vertex. Then, remove less consensual camera one by one, until you're left with CAMERA_NUMBER cameras.
+#define CAMERA_NUMBER 1 						//number of cameras voting for each vertex
+#define VOTE_PIXEL_RADIUS 0
+#define PROJ_MARGIN_RADIUS 10 					//Margin around sudden depth change in images, while reprojecting, to avoid visibility errors due to imprecise geometry/calibration
+#define PROJ_MARGIN_DEPTH_TH 0.03;
+
+// You might want to tweak these:
+#define MAX_FACE_RES 32 						//Maximum face resolution.
+
+// --- Compression parameters ---
+
+#define QUANT_BITS 16 							//Number of bits used to encode the coefficients of the eigen vectors in the PCA decomposition. Can be tuned down, but for a limited gain, and it can become a limiting quality factor...
+												// It is advised to leave it at 16. Bigger than 16 is not supported.
 
 
 #endif // MATRIX_H

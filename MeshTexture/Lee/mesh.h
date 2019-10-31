@@ -148,7 +148,7 @@ template<class PhotoUtils>
 void MySpecialMesh::compressColoredMesh(const PhotoUtils *hyper_volume, int quantFactor, float quantMatCoefs[]){
 
     log(ALWAYS)<<"Starting compression."<<endLog();
-    hyper_volume->reIndexColors(this, 32, quantFactor, quantMatCoefs, -1);
+    hyper_volume->reIndexColors(this, 32, quantMatCoefs, -1);
     
     hyper_volume->compressColor(this, v_edge_real_color_ind_, 32, quantFactor, quantMatCoefs, -1);
     
@@ -161,10 +161,10 @@ void MySpecialMesh::uncompressColoredMesh(const PhotoUtils *hyper_volume, int qu
 
     log(ALWAYS)<<"Starting extraction."<<endLog();
 
-    // hyper_volume->reIndexColors(this, 32, quantFactor, quantMatCoefs, -1);
+    // hyper_volume->reIndexColors(this, 32, quantMatCoefs, -1);
     hyper_volume->decodeCompressedColor(this, 32, quantFactor);
     log(ALWAYS)<<"Extraction complete."<<endLog();
-    // hyper_volume->reIndexColors(this, 32, quantFactor, quantMatCoefs, 0);
+    // hyper_volume->reIndexColors(this, 32, quantMatCoefs, 0);
 }
 
 
