@@ -50,19 +50,27 @@ typedef glm::dvec4   GLM_Vec4;
 
 // --- Coloring parameters ---
 
-#define OUT_OF_CAMERA_NUMBER 1 					//First, select this number of camera for each vertex. Then, remove less consensual camera one by one, until you're left with CAMERA_NUMBER cameras.
-#define CAMERA_NUMBER 1 						//number of cameras voting for each vertex
+#define OUT_OF_CAMERA_NUMBER 1 					// First, select this number of camera for each vertex. Then, remove less consensual camera one by one, until you're left with CAMERA_NUMBER cameras.
+#define CAMERA_NUMBER 1 						// number of cameras voting for each vertex
 #define VOTE_PIXEL_RADIUS 0
-#define PROJ_MARGIN_RADIUS 10 					//Margin around sudden depth change in images, while reprojecting, to avoid visibility errors due to imprecise geometry/calibration
+#define PROJ_MARGIN_RADIUS 10 					// Margin around sudden depth change in images, while reprojecting, to avoid visibility errors due to imprecise geometry/calibration
 #define PROJ_MARGIN_DEPTH_TH 0.03;
 
 // You might want to tweak these:
-#define MAX_FACE_RES 32 						//Maximum face resolution.
+#define MAX_FACE_RES 32 						// Maximum face resolution.
+#define DOWNSAMPLE_THRESHOLD 30 				// Parameter th in the paper
+#define FACE_RES_RATIO 3 						// Parameter ? in the paper
 
 // --- Compression parameters ---
 
-#define QUANT_BITS 16 							//Number of bits used to encode the coefficients of the eigen vectors in the PCA decomposition. Can be tuned down, but for a limited gain, and it can become a limiting quality factor...
+#define QUANT_BITS 16 							// Number of bits used to encode the coefficients of the eigen vectors in the PCA decomposition. Can be tuned down, but for a limited gain, and it can become a limiting quality factor...
 												// It is advised to leave it at 16. Bigger than 16 is not supported.
 
+#define QUANT_FACTOR 4096 						// Quantization factor. Main parameter to tweak, for varying compression ratio.
+#define QUANT_MAT_L1 1.0 						// Parameters for building quantization matrix
+# define QUANT_MAT_L2 0.01 						// For each coefficient i (from 0 to space_dim), quant(i) = QUANT_FACTOR * (1 + QUANT_MAT_L1 * i + QUANT_MAT_L2 * i*i)
+												// Not very useful to change.
+												// WARNING!!! For the time being, these 3 parameters (QUNAT_FACTOR, QUANT_MAT_L1, QUANT_MAT_L2) are NOT encoded with the data. They must be known before decoding.
+												// (Contrary to QUANT_BITS, which is read from the file).
 
 #endif // MATRIX_H

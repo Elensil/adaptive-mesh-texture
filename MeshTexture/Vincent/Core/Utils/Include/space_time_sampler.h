@@ -63,13 +63,6 @@ public:
                             int in_faceResParam,
                             int in_downsamplingThreshold)const;
 
-    template<class InTriangle = MyTriangle, class InPoint = Vector3f, class OutColor = Vector3ui, class MySpecialMesh>
-    void colorInput(MySpecialMesh *in_mesh,
-                            int in_faceResParam,
-                            int in_downsamplingThreshold)const;
-
-
-
     template<class InColor>
     float getColorDistance(const InColor &c1, const InColor &c2)const;
 
@@ -278,8 +271,6 @@ void SpaceTimeSampler::colorPointCloud( MySpecialMesh *in_mesh,
     bool bInputDownsampled = false;
     int projection_margin_radius = PROJ_MARGIN_RADIUS;               
     double projection_margin_depth_threshold = PROJ_MARGIN_DEPTH_TH;
-
-    unsigned int texRes;                 //For filling in texture map: texture resolution (square)
 
     int faceResParam = in_faceResParam;                      //used in the criterion for choosing face resolution per triangle. Choose resolution so that (#votes <= faceResParam * #samples)
                                                 //(Then, pick nearest inferior power of two resolution)
@@ -508,22 +499,7 @@ void SpaceTimeSampler::colorPointCloud( MySpecialMesh *in_mesh,
     std::vector<int32_t> triverts(3);
     int vI, vI2;
     std::vector<float> total_cam_weight(v_cameras_.size(),0.0f);
-    std::vector<OutColor> cam_colors(v_cameras_.size());
-    for(int i=0;i<4;++i)
-        for(int j=0;j<4;++j)
-            for(int k=0;k<4;++k)
-            {
-                if((16*i+4*j+k)<v_cameras_.size())
-                    cam_colors[16*i+4*j+k]=OutColor(255*i/3,255*j/3,255*k/3);
-            }
 
-    std::vector<OutColor> res_colors(6);
-    res_colors[0] = OutColor(0,0,255);
-    res_colors[1] = OutColor(51,0,204);
-    res_colors[2] = OutColor(102,0,153);
-    res_colors[3] = OutColor(153,0,102);
-    res_colors[4] = OutColor(204,0,51);
-    res_colors[5] = OutColor(255,0,0);
     /* -----------------------------------------------------------------------------
     /
     /                       Filtering Cameras
@@ -532,30 +508,6 @@ void SpaceTimeSampler::colorPointCloud( MySpecialMesh *in_mesh,
     log(ALWAYS)<<"[SpaceTimeSampler] : Keeping best cameras only..."<<endLog();
     
     time_begin  = boost::posix_time::microsec_clock::local_time();
-    // --- Triangle version ---
-    /*for(int32_t tri = 0; tri <triangles.size(); ++tri)
-    {
-        std::vector<size_t> sorted_cameras = sort_indexes(voting_cameras_weight[tri]);
-        std::vector<size_t> best_cam(sorted_cameras.end()-CAMERA_NUMBER, sorted_cameras.end());
-        //log(ALWAYS)<<"[SpaceTimeSampler] : best cams: "<<best_cam[0]<<","<<best_cam[1]<<"..."<<endLog();
-        std::vector<float> new_weights;
-        std::vector<OutColor> new_colors;
-        std::vector<Vector3f> new_bary_coords;
-        for(int i=0; i<colors[tri].size();++i)
-        {
-            if(std::find(best_cam.begin(), best_cam.end(), sample_camera_number[tri][i]) != best_cam.end())
-            {
-                new_weights.push_back(incidence_weight[tri][i]);
-                new_colors.push_back(colors[tri][i]);
-                new_bary_coords.push_back(barycoords[tri][i]);
-            }
-        }
-        incidence_weight[tri]=new_weights;
-        colors[tri]=new_colors;
-        barycoords[tri]=new_bary_coords;
-    }
-    */
-    //*
     
     //Vertices version
     /* ------------------------------------------------------------------------------------
@@ -569,11 +521,7 @@ void SpaceTimeSampler::colorPointCloud( MySpecialMesh *in_mesh,
     {
         std::vector<size_t> sorted_cameras = sort_indexes(voting_cameras_weight[tri]);          //sort camera numbers by weight
         std::vector<size_t> best_cam(sorted_cameras.end()-OUT_OF_CAMERA_NUMBER, sorted_cameras.end()); //keep only the best one(s)
-        
-        // best_cam[0]=2;
-
         triangles_cam[tri] = best_cam;
-        // log(ALWAYS)<<"best cam num = ("<<best_cam[0]<<")"<<endLog();
     }
 
     std::vector<std::vector<float> > triangle_cam_red(triangles.size(), std::vector<float> (v_cameras_.size(),0.0f));
@@ -619,7 +567,6 @@ void SpaceTimeSampler::colorPointCloud( MySpecialMesh *in_mesh,
     
     //now, measure consensus of each camera WRT the others, for each vertex
     
-
     int iterNumber = OUT_OF_CAMERA_NUMBER-CAMERA_NUMBER;
     log(ALWAYS)<<"Iter number = "<<iterNumber<<endLog();                           
     //We compute color value per triangle, and use this to discard or select appropriate cameras. Then, we end up with a list of cameras per triangle, just as before, and we can project them back on vertices.
@@ -885,38 +832,36 @@ void SpaceTimeSampler::colorPointCloud( MySpecialMesh *in_mesh,
     
 
 
-    //generate texture map
-    if((in_tex_coords.size()==0)||(in_tex_indices.size()==0))
-    {
-        log(ALWAYS)<<"No texture atlas found. Skipping texture generation."<<endLog();
-    }
-    else
-    {
-        int tr;
-        // std::vector<int> trValues = {512,1024, 1536, 2048,3072,4096,5120,6144,7168,8192};
-        std::vector<int> trValues = {512};
-        for(int trInd = 0;trInd<trValues.size();++trInd)
-        {
-            tr = trValues[trInd];
-            if (!boost::filesystem::exists(outputPath + "texture_" + std::to_string(tr) + ".png"))
-            {
-                log(ALWAYS)<<"Generating texture map..."<<endLog();
-                log(ALWAYS)<<"In tex coords size: "<<in_tex_coords.size()<<endLog();
-                log(ALWAYS)<<"In tex indices size: "<<in_tex_indices.size()<<endLog();
-                texRes=tr;
-                std::ofstream foutTxt(outputPath + "samplingLogFileTxt", std::ios::app);
-                foutTxt<<"--------------------------------------------------"<<std::endl;
-                foutTxt<<"texRes = "<<texRes<<std::endl;
-                foutTxt.close();
-                cv::Mat texMat = generateTextureMap(texRes, texRes, triangles, in_tex_coords, in_tex_indices, points, vertices_cam, camera_K, cam_tri_ind, outputPath);
-                cv::imwrite(outputPath + "texture_" + std::to_string(texRes) + ".png", texMat);
-                log(ALWAYS)<<"texture written ("<<texRes<<")"<<endLog();
-            }
+    // //generate texture map
+    // if((in_tex_coords.size()==0)||(in_tex_indices.size()==0))
+    // {
+    //     log(ALWAYS)<<"No texture atlas found. Skipping texture generation."<<endLog();
+    // }
+    // else
+    // {
+    //     int tr;
+    //     // std::vector<int> trValues = {512,1024, 1536, 2048,3072,4096,5120,6144,7168,8192};
+    //     std::vector<int> trValues = {512};
+    //     for(int trInd = 0;trInd<trValues.size();++trInd)
+    //     {
+    //         tr = trValues[trInd];
+    //         if (!boost::filesystem::exists(outputPath + "texture_" + std::to_string(tr) + ".png"))
+    //         {
+    //             log(ALWAYS)<<"Generating texture map..."<<endLog();
+    //             log(ALWAYS)<<"In tex coords size: "<<in_tex_coords.size()<<endLog();
+    //             log(ALWAYS)<<"In tex indices size: "<<in_tex_indices.size()<<endLog();
+    //             int texRes=tr;
+    //             std::ofstream foutTxt(outputPath + "samplingLogFileTxt", std::ios::app);
+    //             foutTxt<<"--------------------------------------------------"<<std::endl;
+    //             foutTxt<<"texRes = "<<texRes<<std::endl;
+    //             foutTxt.close();
+    //             cv::Mat texMat = generateTextureMap(texRes, texRes, triangles, in_tex_coords, in_tex_indices, points, vertices_cam, camera_K, cam_tri_ind, outputPath);
+    //             cv::imwrite(outputPath + "texture_" + std::to_string(texRes) + ".png", texMat);
+    //             log(ALWAYS)<<"texture written ("<<texRes<<")"<<endLog();
+    //         }
 
-        }
-    }
-
-    // voting_cameras_weight.clear();
+    //     }
+    // }
 
     time_begin  = boost::posix_time::microsec_clock::local_time();
     //Filter and weight votes based on this
@@ -965,20 +910,13 @@ void SpaceTimeSampler::colorPointCloud( MySpecialMesh *in_mesh,
                 OutColor testSmth;
                 //can go beyond 255 because of camera intensity corrections (right?)
                 testSmth(0)= int(float(colors[tri][i](0))/camera_K[sample_camera_number[tri][i]]);
-                // if(testSmth(0)>255)
-                //     testSmth(0)=255;
                 testSmth(0)=std::min(255,std::max(0,int(testSmth(0))));
                 testSmth(1)= int(float(colors[tri][i](1))/camera_K[sample_camera_number[tri][i]]);
-                // if(testSmth(1)>255)
-                //     testSmth(1)=255;
                 testSmth(1)=std::min(255,std::max(0,int(testSmth(1))));
                 testSmth(2)= int(float(colors[tri][i](2))/camera_K[sample_camera_number[tri][i]]);
-                // if(testSmth(2)>255)
-                //     testSmth(2)=255;
                 testSmth(2)=std::min(255,std::max(0,int(testSmth(2))));
                 new_colors.push_back(testSmth);
-                //*/
-                // new_colors.push_back(cam_colors[sample_camera_number[tri][i]]);
+
                 new_bary_coords.push_back(barycoords[tri][i]);
                 new_sample_camera_number.push_back(sample_camera_number[tri][i]);
                 total_cam_weight[sample_camera_number[tri][i]] += myWeight;
@@ -998,10 +936,7 @@ void SpaceTimeSampler::colorPointCloud( MySpecialMesh *in_mesh,
 
 
     log(ALWAYS)<<"[SpaceTimeSampler] : Starting voting process..."<<endLog();
-    //long min_triangle_votes, max_triangle_votes, avg_triangle_votes;
-    //min_triangle_votes=-1;
-    //max_triangle_votes=0;
-    //avg_triangle_votes=0;
+
     time_begin  = boost::posix_time::microsec_clock::local_time();
 
     std::vector<size_t> edge_indices;               //temp vector to store a list of edges with their color indices
@@ -1022,7 +957,6 @@ void SpaceTimeSampler::colorPointCloud( MySpecialMesh *in_mesh,
     sample_camera_number.clear();
     incidence_weight.clear();
 
-    log(ALWAYS)<<"Starting thingy. pointer value: "<<color_index_pointer<<endLog();
     for(int32_t tri = 0; tri <triangles.size(); ++tri) //For every kept triangle
     {
         int idx[2];
@@ -1040,8 +974,8 @@ void SpaceTimeSampler::colorPointCloud( MySpecialMesh *in_mesh,
             }
             else
             {
-                float tri_score = *max_element(voting_cameras_weight[tri].begin(), voting_cameras_weight[tri].end());
-                // while (2*votes_num[tri]>faceRes*faceRes*faceResParam)                   //See paper for justification
+                float tri_score = *max_element(voting_cameras_weight[tri].begin(), voting_cameras_weight[tri].end());       //See paper for justification
+                // while (2*votes_num[tri]>faceRes*faceRes*faceResParam)                   
                 while(2*tri_score>faceRes*faceRes*faceResParam)
                 {       
                     ++faceRes;  
@@ -1058,23 +992,11 @@ void SpaceTimeSampler::colorPointCloud( MySpecialMesh *in_mesh,
 
             faceRes=std::min(faceRes,default_face_res);
 
-            //if(min_triangle_votes=-1){
-            //    min_triangle_votes=colors[tri].size();
-            //}
-            //else
-            //{
-            //    min_triangle_votes=std::min(min_triangle_votes,(long)colors[tri].size());
-            //}
-            //max_triangle_votes=std::max(max_triangle_votes,(long)colors[tri].size());
-            //avg_triangle_votes += ((long)colors[tri].size());
-
-
             unsigned long face_color_index=color_index_pointer;   //reserve space to write this face's colors
             if(faceRes==1||faceRes==2)
                 face_color_index=0;
             color_index_pointer+=(faceRes-1)*(faceRes-2)/2;
-            // log(ALWAYS)<<"Add tri: (+"<<(faceRes-1)*(faceRes-2)/2<<"). New pointer value: "<<color_index_pointer<<" (tri "<<tri<<")"<<endLog();
-
+            
             //fill adjacency matrix for face samples
             for(int b0=1; b0<=faceRes-1;++b0)
                 for(int b1=1; b1<=faceRes-1-b0;++b1)
@@ -1200,26 +1122,22 @@ void SpaceTimeSampler::colorPointCloud( MySpecialMesh *in_mesh,
                                     edge_map.insert(std::pair<std::pair<int,int>,std::pair<int,int> >(std::pair<int,int>(triverts[vI],triverts[vI2]),std::pair<int,int>(edge_indices.size(),faceRes)));
                                     edge_indices.push_back(color_index_pointer);
                                     color_index_pointer+=faceRes;   //faceRes-1 color samples + 1 value for edge Res
-                                    // log(ALWAYS)<<"Add edge: (+"<<faceRes<<"). New pointer value: "<<color_index_pointer<<" (tri "<<tri<<")"<<endLog();
                                     //Display edge res in cyan for debugging
                                     color_map_votes[current_color_index].push_back(OutColor(faceRes,255,255));      //record edgeRes
                                     color_map_votes_weight[current_color_index].push_back(1);
                                     //here, we put blue and green canal to the value of an edge vote, to minimize diskspace (useful?)
                                      //fill adjacency matrix for edge samples:
                                     // edge-edge
-                                    // log(ALWAYS)<<"edge0"<<endLog();
                                     for(int adj=1;adj<faceRes-1;++adj)  //watch out for 'edge res' index
                                     {
                                         i1 = current_color_index+adj;
                                         i2 = current_color_index+adj+1;
                                         addAdjacencyEdge(i1,i2,adjListMat,adjMatInd);
                                     }
-                                    // log(ALWAYS)<<"edge1"<<endLog();
                                     //vertex-edge
                                     i1 = point_indices[triverts[vI]];
                                     i2 = current_color_index+1;
                                     addAdjacencyEdge(i1,i2,adjListMat,adjMatInd);
-                                    // log(ALWAYS)<<"edge2"<<endLog();
                                     i1 = point_indices[triverts[vI2]];
                                     i2 = current_color_index+faceRes-1;
                                     addAdjacencyEdge(i1,i2,adjListMat,adjMatInd);
@@ -1227,7 +1145,6 @@ void SpaceTimeSampler::colorPointCloud( MySpecialMesh *in_mesh,
                                     //face-edge: dealt with later
                                 }
                             }
-                            // log(ALWAYS)<<"edge3"<<endLog();
                             if(color_map_votes[current_color_index][0](0)>faceRes){        //this triangle has lower resolution than the one sharing its edge.
                                 uselessPixels+=color_map_votes[current_color_index][0](0)-faceRes;
                                 edge_res=color_map_votes[current_color_index][0](0);    //In this case, we choose the lower resolution for this edge, for a more consistent looking image
@@ -1238,7 +1155,6 @@ void SpaceTimeSampler::colorPointCloud( MySpecialMesh *in_mesh,
                                     color_map_votes_weight[current_color_index+edge_i] = color_map_votes_weight[current_color_index+(edge_res*edge_i/faceRes)];
                                 }
                                 
-                                //TODO uncomment this
                                 for(int edge_i=faceRes;edge_i<edge_res;++edge_i)
                                 {
                                     removeAdjacencyVertex(edge_i,adjListMat);
@@ -1246,21 +1162,8 @@ void SpaceTimeSampler::colorPointCloud( MySpecialMesh *in_mesh,
                                 removeAdjacencyEdge(point_indices[triverts[vI2]],current_color_index+edge_res-1, adjListMat,adjMatInd);
                                 removeAdjacencyEdge(current_color_index+faceRes-1,current_color_index+faceRes, adjListMat,adjMatInd);
                                 addAdjacencyEdge(point_indices[triverts[vI2]],current_color_index+faceRes-1, adjListMat,adjMatInd);
-                                if(faceRes<=1)
-                                {
-                                    log(WARN)<<"Wololo?"<<endLog();
-                                }
-                                // if(faceRes>1)
-                                // {
-                                //     samples_adj[current_color_index+faceRes-1].remove(current_color_index+faceRes);
-
-                                    
-                                //     samples_adj[current_color_index+faceRes-1].push_back(point_indices[triverts[vI2]]);
-                                //     samples_adj[point_indices[triverts[vI2]]].push_back(current_color_index+faceRes-1);
-                                // }
-                                // samples_adj[point_indices[triverts[vI2]]].remove(current_color_index+edge_res-1);
+                                
                             }
-                            // log(ALWAYS)<<"edge4"<<endLog();
                             edge_res=color_map_votes[current_color_index][0](0);
                             if((edgeSampInd*edge_res)%faceRes==0)          //if the edge has a lower resolution than the face, only add vote if the current edge point is a sample
                             {
@@ -1281,28 +1184,17 @@ void SpaceTimeSampler::colorPointCloud( MySpecialMesh *in_mesh,
                             current_color_index = face_color_index + (b0-1)*faceRes - (b0*(b0+1))/2 +1 + (b1-1);
                         }
                     }
-                    // log(ALWAYS)<<"edge5"<<endLog();
                     if(current_color_index>=0)
                     {
                         float lambda1 = float(b0)/float(faceRes);
                         float lambda2 = float(b1)/float(faceRes);
                         float lambda3 = 1-lambda1-lambda2;
                         Vector3f myBarycoords = Vector3f(lambda1,lambda2,lambda3);
-                        // log(ALWAYS)<<"edge6"<<endLog();
-                        // log(ALWAYS)<<"current_color_index = "<<current_color_index<<endLog();
                         for(int verNum=0;verNum<3;++verNum)     //for each vertex
                         {
-                            // log(ALWAYS)<<"verNum = "<<verNum;
-                            // log(ALWAYS)<<" triverts[verNum] = "<<triverts[verNum]<<endLog();
-                            // log(ALWAYS)<<"vertices cam size = "<<vertices_cam.size();
-                            // log(ALWAYS)<<" vertices_cam[triverts[verNum]].size() = "<<vertices_cam[triverts[verNum]].size()<<endLog();
                             for(int myCam=0;myCam<vertices_cam[triverts[verNum]].size();++myCam)
                             {
-                                // log(ALWAYS)<<"WHAAAAAT?"<<endLog();
-                                // log(ALWAYS)<<"verNum = "<<verNum<<endLog();
-                                // log(ALWAYS)<<", myCam = "<<myCam<<endLog();
                                 int camNum = vertices_cam[triverts[verNum]][myCam];
-                                // log(ALWAYS)<<" cam ok "<<endLog();
                                 OutColor inputColor=OutColor(0,0,0);
                                 bool is_safe=true;
                                 if(tri==-1)
@@ -1311,51 +1203,30 @@ void SpaceTimeSampler::colorPointCloud( MySpecialMesh *in_mesh,
                                 }
                                 else
                                 {
-                                    // log(ALWAYS)<<"case 0 "<<endLog();
                                     is_safe = getSurfacePointColor(triangle, points, myBarycoords,camNum,inputColor, false, bInputDownsampled);
 
                                 }
                                 if(is_safe)
                                 {
-                                    // log(ALWAYS)<<"case 1 "<<endLog();
                                     inputColor(0) = (unsigned int)(std::min(255.0f,std::max(0.0f,float(inputColor(0))/camera_K[camNum])));
                                     inputColor(1) = (unsigned int)(std::min(255.0f,std::max(0.0f,float(inputColor(1))/camera_K[camNum])));
                                     inputColor(2) = (unsigned int)(std::min(255.0f,std::max(0.0f,float(inputColor(2))/camera_K[camNum])));
-                                    // inputColor = cam_colors[camNum];
-                                    // int faceResPow=0;
-                                    // int faceResTemp=faceRes;
-                                    // while(faceResTemp>1)
-                                    // {
-                                    //     ++faceResPow;
-                                    //     faceResTemp/=2;
-                                    // }
-                                    // inputColor = res_colors[faceResPow];
-                                    // log(ALWAYS)<<"color_map_votes[current_color_index] size = "<<color_map_votes[current_color_index].size()<<endLog();
-                                    // log(ALWAYS)<<"color_map_votes_weight[current_color_index] = "<<color_map_votes_weight[current_color_index].size()<<endLog();
                                     color_map_votes[current_color_index].push_back(inputColor);
                                     color_map_votes_weight[current_color_index].push_back(myBarycoords(verNum));
                                 }
-                                // log(ALWAYS)<<"end"<<endLog();
-  
                             }
                         }
-                        // log(ALWAYS)<<"edge7"<<endLog();
                     }
                 }
             }
-            // log(ALWAYS)<<"tri "<<tri<<": ok?"<<endLog();
             //Update triangle
             triangle.ref = point_indices[triangle.ref];
             triangle.edge1 = point_indices[triangle.edge1];
             triangle.edge2 = point_indices[triangle.edge2];
-            // log(ALWAYS)<<"wololo"<<endLog();
             in_faces.push_back(triangle);
             out_face_res.push_back(faceRes);
-             // log(ALWAYS)<<"wololo2"<<endLog();
             out_face_color_ind.push_back(face_color_index);
             out_edge_color_ind.push_back(edge_ind);
-             // log(ALWAYS)<<"wololo3"<<endLog();
-
         }
     }
     fout<<"Dead pixels remaining: "<<uselessPixels<<std::endl;
@@ -1538,10 +1409,6 @@ void SpaceTimeSampler::colorPointCloud( MySpecialMesh *in_mesh,
     // Downsampling part
     //*
     fout<<"color samples: "<<out_colors.size()<<std::endl;
-
-    // downsampleMeshColor(in_faces, out_colors, out_face_res, temp_edge_color_ind, out_face_color_ind, downsamplingThreshold);
-    // fout<<"color samples after downsampling: "<<out_colors.size()<<std::endl;
-    
     fout.close();
 
     //Update input mesh
@@ -1564,768 +1431,7 @@ void SpaceTimeSampler::colorPointCloud( MySpecialMesh *in_mesh,
     //The following lines is a necessary if reIndexColors is not run (I think?)
     // out_edge_color_ind=temp_edge_color_ind;
     // in_mesh->setEdgesIndVector(out_edge_color_ind);
-
-    // in_mesh->setAdjListMat(adjListMat);
-    // log(ALWAYS)<<"Creating Mat..."<<endLog();
-    // log(ALWAYS)<<"Mat rows = "<<adjListMat.rows<<endLog();
-    // log(ALWAYS)<<"Mat cols = "<<adjListMat.cols<<endLog();
-    // // cv::Mat testMat = cv::Mat(adjListMat,cv::Rect(0,0,K,50));
-    // cv::Mat testMat = adjListMat;
-    // log(ALWAYS)<<"row example: "<<adjListMat.row(0)<<endLog();
-    // log(ALWAYS)<<"Writing..."<<endLog();
-    // // writeIntMatToFile(testMat,"/morpheo-nas2/marmando/Appearance/ASR/early_tests/adjMat.txt");
-    // // writeMatToFile(out_colors,"/morpheo-nas2/marmando/Appearance/ASR/early_tests/out_colors.txt")
-    // log(ALWAYS)<<"Getting pos..."<<endLog();
-    // std::vector<Vector3f> samples_pos;
-
-    // samples_pos = in_mesh->getSamplesPosition();
-    // // exportOFF(samples_pos,"/morpheo-nas2/marmando/Appearance/ASR/early_tests/samplesPos.txt");
-    // exportCOFF(samples_pos, out_colors, "/morpheo-nas2/marmando/Appearance/ASR/early_tests/samplesPosAndColor.txt");
-    // out_colors[0](0)=1;
-    //consistencyTest(out_colors,out_face_res,out_edge_color_ind,out_face_color_ind);
-
-    log(ALWAYS)<<"Cleaning Done. Kept "<<in_points.size()<<" points, and "<<in_faces.size()<<" faces."<<endLog();
-
     
-}
-
-
-template<class InTriangle, class InPoint, class OutColor, class MySpecialMesh>
-void SpaceTimeSampler::colorInput( MySpecialMesh *in_mesh,
-                                        int in_faceResParam,
-                                        int in_downsamplingThreshold)const
-{
-
-    log(ALWAYS)<<"[SpaceTimeSampler] : Starting Point Cloud cleaning and coloring..."<<endLog();
-
-    // std::vector<InTriangle> &in_faces = in_mesh->getRealFacesVector();
-    // in_faces = in_mesh->getFacesVector();
-    std::vector<InTriangle> in_faces;
-    std::vector<InPoint> in_points;
-    std::vector<OutColor> out_colors;
-    std::vector<unsigned short> out_face_res;
-    std::vector<Vector3li> out_edge_color_ind;
-    std::vector<unsigned long> out_face_color_ind;
-    std::vector<Vector2f> in_tex_coords;
-    std::vector<Vector3uli> in_tex_indices;
-
-
-    in_mesh->getFacesVector(in_faces);
-    in_mesh->getPointsVector(in_points);
-    in_mesh->getTexCoords(in_tex_coords);
-    in_mesh->getTexIndices(in_tex_indices);
-
-    std::string outputPath = output_folder_;
-    
-    // --- CONSTANTS definitions ---
-    unsigned short default_face_res=8;         //maximum face resolution
-    int vote_pixel_radius = 0;                  //When projecting votes, project on neighbouring triangles as well, with this radius.
-                                                //TODO: replace this by saving spatial coordinates (or ray) of votes, and looping through votes of neighbours (for SR)
-    
-    // int OUT_OF_CAMERA_NUMBER = 5;               //First, select this number of camera for each vertex. Then, remove less consensual camera one by one, until you're left with CAMERA_NUMBER cameras.
-    // int CAMERA_NUMBER=5;                        //number of cameras voting for each vertex
-
-    int projection_margin_radius = 10;               
-    double projection_margin_depth_threshold = 0.03;
-    bool bInputDownsampled = true;
-    unsigned int texRes;                 //For filling in texture map: texture resolution (square)
-
-    int faceResParam = in_faceResParam;                      //used in the criterion for choosing face resolution per triangle. Choose resolution so that (#votes <= faceResParam * #samples)
-                                                //(Then, pick nearest inferior power of two resolution)
-
-    int downsamplingThreshold = in_downsamplingThreshold;             //Max error (color euclidian distance) tolerated /pixel when downsampling faces or edges.
-                                                    //Set to -1 to deactivate downsampling entirely 
-
-    std::ofstream fout(outputPath + "samplingLogFilevul", std::ios::app);
-    fout<<"--------------------------------------------------"<<std::endl;
-    fout<<"downsamplingThreshold = "<<downsamplingThreshold<<std::endl;
-    fout<<"default_face_res = "<<default_face_res<<std::endl;
-    
-    fout<<"faceResParam = "<<faceResParam<<std::endl;
-    
-    boost::posix_time::ptime time_begin;     //to measure computation time of different algorithmic blocks.
-    boost::posix_time::time_duration time_diff;
-
-    //Make a copy of faces and points vectors
-    std::vector<InTriangle> triangles(in_faces);        
-    std::vector<InPoint> points(in_points);
-
-    std::vector< std::vector<OutColor> > colors(triangles.size()); //store it in float to compute mean. Changed by Matt: vote associated with triangle
-    std::vector< std::vector<Vector3f> > barycoords(triangles.size()); //created by Matt. Used to store barycentric coordinates of votes
-    std::vector< std::vector<float> > incidence_weight(triangles.size()); //used to store the cos of the incidence angle for each vote, to be used as a weight
-    std::vector< std::vector<short> > sample_camera_number(triangles.size());
-    std::vector<int32_t> voted_color_count(triangles.size(),0);
-    std::vector<InTriangle> kept_triangles;
-    kept_triangles.reserve(triangles.size());
-
-    std::vector<int32_t> new_triangle_index(triangles.size(),-1);
-    
-    std::vector<Vector3f> vertices_normals = getVerticesNormals(triangles,points);
-
-
-    
-
-    //for every cam
-    //TODO: second version of coloring: project samples on cameras (rather than projecting pixels on triangles)
-    std::vector<std::vector<float> > voting_cameras_weight(triangles.size(), std::vector<float>(v_cameras_.size(),0));  //for each triangle/camera, 0 if not seen, (surface seen)*cos(incidence angle) if seen
-
-    for(int tri=0;tri<triangles.size();++tri)
-    {
-        new_triangle_index[tri] = tri;
-    }
-
-    //change vertices order for each triangle, in order to make DCT more efficiently at the end of the pipeline
-    //reorderTrianglesVertices(triangles,points);
-
-    kept_triangles=triangles;
-
-    time_begin  = boost::posix_time::microsec_clock::local_time();
-
-    std::vector<cv::Mat> cam_tri_ind(v_cameras_.size());
-    // ---------------------------------------------------------------------------
-    //      1. Project pixels (votes) on triangles)
-    // ---------------------------------------------------------------------------
-    
-    // log(WARN)<<"[SpaceTimeSampler] : WARNING!! Hard-coded cam number!"<<endLog();
-    #pragma omp parallel for schedule(dynamic)
-    for(unsigned int cam = 0; cam < v_cameras_.size(); ++cam)
-    // for(unsigned int cam = 0; cam < 20; ++cam)
-    {
-        //TBD: make this image size a variable
-        cv::Mat cam_image(IMG_HEIGHT*CLEANING_FACTOR,IMG_WIDTH*CLEANING_FACTOR,CV_32SC1,cv::Scalar(0));//Contains index of the nearest projected triangle +1! (0 is non affected)
-        cv::Mat depth_map(IMG_HEIGHT*CLEANING_FACTOR,IMG_WIDTH*CLEANING_FACTOR,CV_64FC1,cv::Scalar(0.0f));     //used to store depth, so that we can grow a safety margin around foreground triangles
-        cv::Mat confidence_map(IMG_HEIGHT*CLEANING_FACTOR,IMG_WIDTH*CLEANING_FACTOR,CV_64FC1,cv::Scalar(1.0f));     //used to store depth, so that we can grow a safety margin around foreground triangles
-    
-        const Camera &temp_cam = v_cameras_[cam];
-        Vector3f cam_pos = temp_cam.getPosition();
-
-        //First, backproject every point and fill pixels of image with (triangle index +1) if closer than previous registered value
-        setPixelsWhereTrianglesProjectCloser2(triangles,points,cam_image,depth_map,temp_cam, projection_margin_radius, projection_margin_depth_threshold);
-        // setPixelsWhereTrianglesProjectCloserWConfidence(triangles,points,cam_image,depth_map, confidence_map, temp_cam, projection_margin_radius, projection_margin_depth_threshold);
-        
-        cam_tri_ind[cam] = cam_image;
-
-        for(unsigned int y = 0; y < IMG_HEIGHT*CLEANING_FACTOR; ++y)
-        {
-            for(unsigned int x = 0; x < IMG_WIDTH*CLEANING_FACTOR; ++x)
-            {
-                //bleed votes on neighbouring triangles as well
-                std::vector<int32_t>triangles_indices;
-                
-                triangles_indices.reserve(1+vote_pixel_radius*vote_pixel_radius); //theoretical maximum is a bit more than 4 times this
-                //int32_t triangle_idx = cam_image.at<int32_t>(y,x);
-                int32_t triangle_idx;
-                for(int yn = std::max(0,int(y)-vote_pixel_radius);yn<std::min(IMG_HEIGHT*CLEANING_FACTOR,double(int(y)+vote_pixel_radius)+0.1f);++yn)
-                    for(int xn = std::max(0,int(x)-vote_pixel_radius);xn<std::min(IMG_WIDTH*CLEANING_FACTOR,double(int(x)+vote_pixel_radius)+0.1f);++xn)
-                    {
-                        triangle_idx = cam_image.at<int32_t>(yn,xn);
-                        if((triangle_idx > 0) && std::find(triangles_indices.begin(),triangles_indices.end(),triangle_idx)==triangles_indices.end())
-                            triangles_indices.push_back(triangle_idx);
-                    }
-
-                for(int index_ind=0;index_ind < triangles_indices.size();++index_ind)
-                {
-                    triangle_idx = triangles_indices[index_ind];
-                    if(triangle_idx > 0)
-                    {
-                        triangle_idx -= (int32_t)1; //Adjust index according to offset
-                        const InTriangle &tri = triangles[triangle_idx];
-                        /*
-                        if(new_triangle_index[triangle_idx] < 0)
-                        {
-                            #pragma omp critical
-                            {
-                                //new_triangle_index[triangle_idx] = kept_triangles.size();
-                                //kept_triangles.push_back(tri);
-                            }
-                        }
-                        */
-                        cv::Vec3b col;//BGR order
-                        Vector2f tex_coords;
-                        bool is_safe = true;
-                        
-                        
-                        Vector2f ref_coords,edge1_coords,edge2_coords;
-                        temp_cam.getTextureCoords(points[tri.ref],ref_coords);
-                        temp_cam.getTextureCoords(points[tri.edge1],edge1_coords);
-                        temp_cam.getTextureCoords(points[tri.edge2],edge2_coords);
-
-                        //Compute barycentric coordinates
-                        double x1,x2,x3,y1,y2,y3,lambda1,lambda2, xd, yd;
-                        x1 = ref_coords(1);     y1 = ref_coords(0);
-                        x2 = edge1_coords(1);   y2 = edge1_coords(0);
-                        x3 = edge2_coords(1);   y3 = edge2_coords(0);
-                        xd = double(x)/(CLEANING_FACTOR);
-                        yd = double(y)/(CLEANING_FACTOR);
-
-                        lambda1 = ((y2-y3)*(xd-x3) + (x3-x2)*(yd-y3)) / ((y2-y3)*(x1-x3) + (x3-x2)*(y1-y3));
-                        lambda2 = ((y3-y1)*(xd-x3) + (x1-x3)*(yd-y3)) / ((y2-y3)*(x1-x3) + (x3-x2)*(y1-y3));
-
-                        //we want the color value of our current subpixel
-                        tex_coords[1]=xd;
-                        tex_coords[0]=yd;
-
-
-                        //get position of point
-                        Vector3f fragPos = lambda1*points[tri.ref]+lambda2*points[tri.edge1]+(1-lambda1-lambda2)*points[tri.edge2];
-                        Vector3f camRay = cam_pos-fragPos;
-                        Vector3f fragNormal = lambda1*vertices_normals[tri.ref]+lambda2*vertices_normals[tri.edge1]+(1-lambda1-lambda2)*vertices_normals[tri.edge2];
-                        camRay.normalize();
-                        fragNormal.normalize();
-
-                        is_safe = temp_cam.getPixelColor(tex_coords,col);
-
-                        if(is_safe)
-                        {
-                            #pragma omp critical
-                            {
-                                //store color value and barycentric coordinates
-                                colors[triangle_idx].push_back(OutColor(col[2],col[1],col[0]));
-                                barycoords[triangle_idx].push_back(Vector3f(lambda1,lambda2,1-lambda1-lambda2));
-                                //incidence_weight[triangle_idx].push_back(std::abs(fragNormal.dot(camRay)));
-                                incidence_weight[triangle_idx].push_back(1);                                    //test: incidence angle is kind of already included in visible area. No need to count it twice
-                                // incidence_weight[triangle_idx].push_back(confidence_map.at<double>(y,x));           //test: linearly vary weight of pixel near border, to account for confidence in reprojection
-
-                                sample_camera_number[triangle_idx].push_back(cam);
-                                ++voted_color_count[triangle_idx];
-                            }
-                        }
-                        if(lambda1>=0 && lambda2>=0 && (1-lambda1-lambda2)>=0)
-                        {
-                            voting_cameras_weight[triangle_idx][cam]+= std::abs(fragNormal.dot(camRay));    //increment surface by cos of incidence angle for (camera,triangle) pair
-                            // voting_cameras_weight[triangle_idx][cam]+= std::abs(fragNormal.dot(camRay))*confidence_map.at<double>(y,x);    //increment surface by cos of incidence angle for (camera,triangle) pair
-                        }
-                    }
-                }//new loop
-            }
-        }
-    }
-
-    time_diff = boost::posix_time::microsec_clock::local_time() - time_begin;
-    log(ALWAYS)<<"[SpaceTimeSampler] : Get triangle per pixel + voting: "<<int(float(time_diff.total_milliseconds())/1000)<<" s"<<endLog();
-
-    log(ALWAYS)<<"[SpaceTimeSampler] : Coloring Done, Cleaning..."<<endLog();
-
-    in_faces.clear();
-    in_faces.reserve(triangles.size());
-    in_points.clear();
-    in_points.reserve(points.size());
-    out_colors.clear();
-    
-    
-    std::vector<int32_t> point_indices(points.size(),-1);
-    
-    // long max_sample_size = points.size()+triangles.size()*(3*default_face_res/2+(default_face_res-1)*(default_face_res-2)/2);       //Assimptotical max number, if we ignore edge triangles (or with a watertight mesh)
-    long max_sample_size = points.size()+triangles.size()*(3*default_face_res+(default_face_res-1)*(default_face_res-2)/2);       //Max number if every triangle is disconnected (edges not shared)
-    
-    int max_votes_number = 30;       //Empirical value!
-
-    std::vector< std::vector<OutColor> > color_map_votes(max_sample_size);    //to store the color map (duh). Should reserve memory space?
-    std::vector< std::vector<float> > color_map_votes_weight(max_sample_size); //each vote is weighted by distance
-
-
-    std::vector<std::list<int32_t> > samples_adj(max_sample_size);
-    log(ALWAYS)<<"Points Size = "<<points.size()<<endLog();
-    log(ALWAYS)<<"triangles Size = "<<triangles.size()<<endLog();
-    log(ALWAYS)<<"samples_adj Size = "<<samples_adj.size()<<endLog();
-    //int dims[] = {points.size()+triangles.size()*(3*default_face_res/2+(default_face_res-1)*(default_face_res-2)/2),points.size()+triangles.size()*(3*default_face_res/2+(default_face_res-1)*(default_face_res-2)/2)};
-    // int dims[] = {1,1};
-    // cv::SparseMat adj_mat(2,dims,CV_8SC1);
-    int K = 20;     //max number of neighbours. Arbitrary/empirical
-    cv::Mat adjListMat(max_sample_size, K, CV_32SC1, cv::Scalar(-1));
-
-    // std::vector<Vector15ui> colorsTotal;
-    cv::Mat colorsTotal(max_sample_size, 3*CAMERA_NUMBER, CV_32SC1, cv::Scalar(0));
-
-    std::vector<int> adjMatInd(max_sample_size, 1);
-
-    for(int i=0;i<adjListMat.rows;++i)
-    {
-        adjListMat.at<int32_t>(i,0)=i;
-    }
-
-    std::map< std::pair<int,int>,std::pair<int,int> > edge_map;     //key is (1st vertex index, 2nd vertex index), value is (color index, edge resolution)
-
-    std::map< std::pair<int,int>,std::pair<int,int> >::iterator it;
-
-    //define face resolution for each triangle, and deal with vertices
-    out_face_res.clear();
-    out_face_res.reserve(triangles.size());
-    out_edge_color_ind.clear();
-    out_edge_color_ind.reserve(triangles.size());
-    out_face_color_ind.clear();
-    out_face_color_ind.reserve(triangles.size());
-
-    unsigned long color_index_pointer = points.size();            //used as an incremented pointer into color_map for edges and faces values
-    std::vector<int32_t> triverts(3);
-    int vI, vI2;
-    std::vector<float> total_cam_weight(v_cameras_.size(),0.0f);
-    std::vector<OutColor> cam_colors(v_cameras_.size());
-    for(int i=0;i<4;++i)
-        for(int j=0;j<4;++j)
-            for(int k=0;k<4;++k)
-            {
-                if((16*i+4*j+k)<v_cameras_.size())
-                    cam_colors[16*i+4*j+k]=OutColor(255*i/3,255*j/3,255*k/3);
-            }
-
-    std::vector<OutColor> res_colors(6);
-    res_colors[0] = OutColor(0,0,255);
-    res_colors[1] = OutColor(51,0,204);
-    res_colors[2] = OutColor(102,0,153);
-    res_colors[3] = OutColor(153,0,102);
-    res_colors[4] = OutColor(204,0,51);
-    res_colors[5] = OutColor(255,0,0);
-    /* -----------------------------------------------------------------------------
-    /
-    /                       Filtering Cameras
-    /
-    / ------------------------------------------------------------------------------ */
-    log(ALWAYS)<<"[SpaceTimeSampler] : Keeping best cameras only..."<<endLog();
-    
-    time_begin  = boost::posix_time::microsec_clock::local_time();
-    // --- Triangle version ---
-    /*for(int32_t tri = 0; tri <triangles.size(); ++tri)
-    {
-        std::vector<size_t> sorted_cameras = sort_indexes(voting_cameras_weight[tri]);
-        std::vector<size_t> best_cam(sorted_cameras.end()-CAMERA_NUMBER, sorted_cameras.end());
-        //log(ALWAYS)<<"[SpaceTimeSampler] : best cams: "<<best_cam[0]<<","<<best_cam[1]<<"..."<<endLog();
-        std::vector<float> new_weights;
-        std::vector<OutColor> new_colors;
-        std::vector<Vector3f> new_bary_coords;
-        for(int i=0; i<colors[tri].size();++i)
-        {
-            if(std::find(best_cam.begin(), best_cam.end(), sample_camera_number[tri][i]) != best_cam.end())
-            {
-                new_weights.push_back(incidence_weight[tri][i]);
-                new_colors.push_back(colors[tri][i]);
-                new_bary_coords.push_back(barycoords[tri][i]);
-            }
-        }
-        incidence_weight[tri]=new_weights;
-        colors[tri]=new_colors;
-        barycoords[tri]=new_bary_coords;
-    }
-    */
-    //*
-    
-    //Vertices version
-    /* ------------------------------------------------------------------------------------
-    / Determine intensity multipliers per cameras
-    / ------------------------------------------------------------------------------------ */
-    std::vector<std::vector<size_t> > vertices_cam(points.size());
-    std::vector<std::vector<size_t> > triangles_cam(triangles.size());  //keep best cams per triangle as well, for later use in SR
-
-    //For each triangle, get best cam, and add it to vertices
-    for(int32_t tri = 0; tri <triangles.size(); ++tri)
-    {
-        std::vector<size_t> sorted_cameras = sort_indexes(voting_cameras_weight[tri]);          //sort camera numbers by weight
-        std::vector<size_t> best_cam(sorted_cameras.end()-OUT_OF_CAMERA_NUMBER, sorted_cameras.end()); //keep only the best one(s)
-        
-        // best_cam[0]=2;
-
-        triangles_cam[tri] = best_cam;
-        // log(ALWAYS)<<"best cam num = ("<<best_cam[0]<<")"<<endLog();
-    }
-
-    //Project triangles' cameras on vertices
-    for(int tri=0; tri<triangles.size();++tri)
-    {
-        vertices_cam[triangles[tri].ref].insert(vertices_cam[triangles[tri].ref].end(),triangles_cam[tri].begin(),triangles_cam[tri].end());        //add camera(s) to all 3 vertices
-        vertices_cam[triangles[tri].edge2].insert(vertices_cam[triangles[tri].edge2].end(),triangles_cam[tri].begin(),triangles_cam[tri].end());
-        vertices_cam[triangles[tri].edge1].insert(vertices_cam[triangles[tri].edge1].end(),triangles_cam[tri].begin(),triangles_cam[tri].end());
-    }
-    //now, we have a list of best cams for each vertex.
-
-
-
-
-    
-    time_diff = boost::posix_time::microsec_clock::local_time() - time_begin;
-    log(ALWAYS)<<"[SpaceTimeSampler] : Get best cameras per vertex, and intensity factors: "<<(float(time_diff.total_milliseconds())/1000)<<" s"<<endLog();
-    
-
-
-    // //generate texture map
-    // if((in_tex_coords.size()==0)||(in_tex_indices.size()==0))
-    // {
-    //     log(ALWAYS)<<"No texture atlas found. Skipping texture generation."<<endLog();
-    // }
-    // else
-    // {
-    //     int tr;
-    //     // std::vector<int> trValues = {512,1024, 1536, 2048,3072,4096,5120,6144,7168,8192};
-    //     std::vector<int> trValues = {512};
-    //     for(int trInd = 0;trInd<trValues.size();++trInd)
-    //     {
-    //         tr = trValues[trInd];
-    //         if (!boost::filesystem::exists(outputPath + "texture_" + std::to_string(tr) + ".png"))
-    //         {
-    //             log(ALWAYS)<<"Generating texture map..."<<endLog();
-    //             log(ALWAYS)<<"In tex coords size: "<<in_tex_coords.size()<<endLog();
-    //             log(ALWAYS)<<"In tex indices size: "<<in_tex_indices.size()<<endLog();
-    //             texRes=tr;
-    //             std::ofstream foutTxt(outputPath + "samplingLogFileTxt", std::ios::app);
-    //             foutTxt<<"--------------------------------------------------"<<std::endl;
-    //             foutTxt<<"texRes = "<<texRes<<std::endl;
-    //             foutTxt.close();
-    //             cv::Mat texMat = generateTextureMap(texRes, texRes, triangles, in_tex_coords, in_tex_indices, points, vertices_cam, camera_K, cam_tri_ind, outputPath);
-    //             cv::imwrite(outputPath + "texture_" + std::to_string(texRes) + ".png", texMat);
-    //             log(ALWAYS)<<"texture written ("<<texRes<<")"<<endLog();
-    //         }
-
-    //     }
-    // }
-
-    // voting_cameras_weight.clear();
-
-    time_begin  = boost::posix_time::microsec_clock::local_time();
-
-
-    time_diff = boost::posix_time::microsec_clock::local_time() - time_begin;
-    log(ALWAYS)<<"[SpaceTimeSampler] : Filter and correct votes: "<<int(float(time_diff.total_milliseconds())/1000)<<" s"<<endLog();
-
-    // Filtering cameras complete
-    // -----------------------------------------------------------
-
-
-    log(ALWAYS)<<"[SpaceTimeSampler] : Starting voting process..."<<endLog();
-
-    time_begin  = boost::posix_time::microsec_clock::local_time();
-
-    std::vector<size_t> edge_indices;               //temp vector to store a list of edges with their color indices
-    edge_indices.clear();                           //makes color reindexing easier down the road
-    edge_indices.reserve(triangles.size()*3/2);
-    edge_indices.push_back(0);
-
-
-    int uselessPixels=0;    //counter for pixels being freed when an edge changes resolution
-
-    std::vector<unsigned int> votes_num(colors.size());
-    for(int32_t tri = 0; tri <triangles.size(); ++tri) //For every kept triangle
-    {
-        votes_num[tri] = colors[tri].size();
-    }
-    colors.clear();
-    barycoords.clear();
-    sample_camera_number.clear();
-    incidence_weight.clear();
-
-    log(ALWAYS)<<"Starting thingy. pointer value: "<<color_index_pointer<<endLog();
-    for(int32_t tri = 0; tri <triangles.size(); ++tri) //For every kept triangle
-    {
-        int idx[2];
-        int32_t i1, i2;
-        //define some local loop variable, to make the code clearer
-        if(new_triangle_index[tri] >= -1)
-        {
-            long current_color_index;
-
-            unsigned short faceRes=1;
-            
-            if(faceResParam==0)
-            {
-                faceRes=default_face_res;
-            }
-            else
-            {
-                float tri_score = *max_element(voting_cameras_weight[tri].begin(), voting_cameras_weight[tri].end());
-                // while (2*votes_num[tri]>faceRes*faceRes*faceResParam)                   //See paper for justification
-                while(2*tri_score>faceRes*faceRes*faceResParam)
-                {       
-                    ++faceRes;  
-                }
-                if(faceRes>1)
-                {
-                    --faceRes;
-                }
-                while (not ((faceRes & (faceRes-1)) == 0))       //we want face resolutions to be powers of 2
-                {
-                    faceRes+=1; //WARNING: changed from truncating to taking upper value!
-                }
-            }
-
-            faceRes=std::min(faceRes,default_face_res);
-
-
-            unsigned long face_color_index=color_index_pointer;   //reserve space to write this face's colors
-            if(faceRes==1||faceRes==2)
-                face_color_index=0;
-            color_index_pointer+=(faceRes-1)*(faceRes-2)/2;
-            // log(ALWAYS)<<"Add tri: (+"<<(faceRes-1)*(faceRes-2)/2<<"). New pointer value: "<<color_index_pointer<<" (tri "<<tri<<")"<<endLog();
-            
-            InTriangle &triangle = kept_triangles[new_triangle_index[tri]];
-            triverts[0] = triangle.ref;
-            triverts[1] = triangle.edge1;
-            triverts[2] = triangle.edge2;
-            Vector3li edge_ind = Vector3li(0,0,0);
-            int edge_num, edge_res;
-            for(int j=0;j<3;++j)
-            {
-                if(point_indices[triverts[j]] == -1)         //vertex not saved in new vector vector yet. Add it
-                {
-                    //Save index and vertex in new vectors
-                    point_indices[triverts[j]] = in_points.size();
-                    in_points.push_back(points[triverts[j]]);
-                }
-            }
-
-            //Go get color in the input images, rather than projecting votes on the surface
-            //*
-            for(int b0=0;b0<=faceRes;++b0)
-            {
-                for(int b1=0;b1<=faceRes-b0;++b1)
-                {
-                    // log(ALWAYS)<<"wut"<<endLog();
-                    current_color_index=-1;
-                    vI = -1;    //dirty trick to save code... Useful for now
-                    vI2 = -1;
-                    if(b0==faceRes)     //1st vertex
-                    {
-                        current_color_index=point_indices[triverts[0]];
-                    }
-                    else if(b1==faceRes)    //2nd vertex
-                    {
-                        current_color_index=point_indices[triverts[1]];
-                    }
-                    else if((b0==0)&&(b1==0))   //3rd vertex
-                    {
-                        current_color_index=point_indices[triverts[2]];
-                    }
-                    else
-                    {
-                        int edgeSampInd=-1;
-                        if(b0==0)   //2nd edge (v3,v2)
-                        {
-                            vI=2;
-                            vI2=1;
-                            edge_num=1;
-                            edgeSampInd=b1;
-                        }
-                        else if (b1==0)     //3rd edge (v1,v3)
-                        {
-                            vI=0;
-                            vI2=2;
-                            edge_num=2;
-                            edgeSampInd=faceRes-b0;
-                        }
-                        else if (b0+b1==faceRes)     //1st edge, (v2,v1)
-                        {
-                            vI=1;
-                            vI2=0;
-                            edge_num=0;
-                            edgeSampInd=b0;
-                        }
-
-                        if(vI>=0)
-                        {
-                            it = edge_map.find(std::pair<int,int>(triverts[vI],triverts[vI2]));
-                            if(it!=edge_map.end())          //existing edge case
-                            {
-                                current_color_index = edge_indices[(it->second).first];    //get color index from edge map
-                                edge_ind(edge_num,0)=(it->second).first;
-                            }
-                            else
-                            {
-                                it = edge_map.find(std::make_pair(triverts[vI2],triverts[vI]));
-                                if(it!=edge_map.end())      //inverted edge case
-                                {
-                                    int temp = vI;      //does this work as intended?
-                                    vI = vI2;
-                                    vI2=temp;
-                                    current_color_index = edge_indices[(it->second).first];    //get color index from edge map
-                                    edge_ind(edge_num,0)=-(it->second).first;
-                                }
-                                else    //not recorded yet
-                                {
-                                    current_color_index = color_index_pointer;
-                                    edge_ind(edge_num,0)=edge_indices.size();
-                                    
-                                    edge_map.insert(std::pair<std::pair<int,int>,std::pair<int,int> >(std::pair<int,int>(triverts[vI],triverts[vI2]),std::pair<int,int>(edge_indices.size(),faceRes)));
-                                    edge_indices.push_back(color_index_pointer);
-                                    color_index_pointer+=faceRes;   //faceRes-1 color samples + 1 value for edge Res
-                                    // log(ALWAYS)<<"Add edge: (+"<<faceRes<<"). New pointer value: "<<color_index_pointer<<" (tri "<<tri<<")"<<endLog();
-                                    //Display edge res in cyan for debugging
-                                    color_map_votes[current_color_index].push_back(OutColor(faceRes,255,255));      //record edgeRes
-                                    color_map_votes_weight[current_color_index].push_back(1);
-                                    //here, we put blue and green canal to the value of an edge vote, to minimize diskspace (useful?)
-                                }
-                            }
-                            // log(ALWAYS)<<"edge3"<<endLog();
-                            if(color_map_votes[current_color_index][0](0)>faceRes){        //this triangle has lower resolution than the one sharing its edge.
-                                uselessPixels+=color_map_votes[current_color_index][0](0)-faceRes;
-                                edge_res=color_map_votes[current_color_index][0](0);    //In this case, we choose the lower resolution for this edge, for a more consistent looking image
-                                color_map_votes[current_color_index][0](0)=faceRes;
-
-                                for(int edge_i=1;edge_i<=faceRes-1;edge_i++){            //Drop extra samples and move the "good" ones to their new place
-                                    color_map_votes[current_color_index+edge_i] = color_map_votes[current_color_index+(edge_res*edge_i/faceRes)];
-                                    color_map_votes_weight[current_color_index+edge_i] = color_map_votes_weight[current_color_index+(edge_res*edge_i/faceRes)];
-                                }
-                                
-                                //TODO uncomment this
-                                for(int edge_i=faceRes;edge_i<edge_res;++edge_i)
-                                {
-                                    removeAdjacencyVertex(edge_i,adjListMat);
-                                }
-                                removeAdjacencyEdge(point_indices[triverts[vI2]],current_color_index+edge_res-1, adjListMat,adjMatInd);
-                                removeAdjacencyEdge(current_color_index+faceRes-1,current_color_index+faceRes, adjListMat,adjMatInd);
-                                addAdjacencyEdge(point_indices[triverts[vI2]],current_color_index+faceRes-1, adjListMat,adjMatInd);
-                                if(faceRes<=1)
-                                {
-                                    log(WARN)<<"Wololo?"<<endLog();
-                                }
-                                // if(faceRes>1)
-                                // {
-                                //     samples_adj[current_color_index+faceRes-1].remove(current_color_index+faceRes);
-
-                                    
-                                //     samples_adj[current_color_index+faceRes-1].push_back(point_indices[triverts[vI2]]);
-                                //     samples_adj[point_indices[triverts[vI2]]].push_back(current_color_index+faceRes-1);
-                                // }
-                                // samples_adj[point_indices[triverts[vI2]]].remove(current_color_index+edge_res-1);
-                            }
-                            // log(ALWAYS)<<"edge4"<<endLog();
-                            edge_res=color_map_votes[current_color_index][0](0);
-                            if((edgeSampInd*edge_res)%faceRes==0)          //if the edge has a lower resolution than the face, only add vote if the current edge point is a sample
-                            {
-                                current_color_index+=edgeSampInd*edge_res/faceRes;     // (-1 +1 because of 1st value used for the edgeRes)
-                            }
-                            else
-                            {
-                                current_color_index=-1;     //don't do anything
-                            }
-                            if(edge_ind(edge_num,0)<0)
-                            {
-                                current_color_index=-1;
-                            }
-                        }
-                        //edge case taken care of. Only the face to go!!
-                        else
-                        {
-                            current_color_index = face_color_index + (b0-1)*faceRes - (b0*(b0+1))/2 +1 + (b1-1);
-                        }
-                    }
-                    // log(ALWAYS)<<"edge5"<<endLog();
-                    if(current_color_index>=0)
-                    {
-                        float lambda1 = float(b0)/float(faceRes);
-                        float lambda2 = float(b1)/float(faceRes);
-                        float lambda3 = 1-lambda1-lambda2;
-                        Vector3f myBarycoords = Vector3f(lambda1,lambda2,lambda3);
-                        // log(ALWAYS)<<"edge6"<<endLog();
-                        // log(ALWAYS)<<"current_color_index = "<<current_color_index<<endLog();
-                        for(int verNum=0;verNum<3;++verNum)     //for each vertex
-                        {
-                            // log(ALWAYS)<<"verNum = "<<verNum;
-                            // log(ALWAYS)<<" triverts[verNum] = "<<triverts[verNum]<<endLog();
-                            // log(ALWAYS)<<"vertices cam size = "<<vertices_cam.size();
-                            // log(ALWAYS)<<" vertices_cam[triverts[verNum]].size() = "<<vertices_cam[triverts[verNum]].size()<<endLog();
-                            for(int myCam=0;myCam<triangles_cam[tri].size();++myCam)
-                            {
-                                // log(ALWAYS)<<"WHAAAAAT?"<<endLog();
-                                // log(ALWAYS)<<"verNum = "<<verNum<<endLog();
-                                // log(ALWAYS)<<", myCam = "<<myCam<<endLog();
-                                int camNum = triangles_cam[tri][myCam];
-                                // log(ALWAYS)<<" cam ok "<<endLog();
-                                OutColor inputColor=OutColor(0,0,0);
-                                bool is_safe=true;
-                                if(tri==-1)
-                                {
-
-                                }
-                                else
-                                {
-                                    // log(ALWAYS)<<"case 0 "<<endLog();
-                                    is_safe = getSurfacePointColor(triangle, points, myBarycoords,camNum,inputColor,false,bInputDownsampled);
-
-                                }
-                                if(!is_safe)
-                                {
-                                    inputColor=OutColor(0,0,0);
-                                }
-                                // if(is_safe)
-                                // {
-                                    // // log(ALWAYS)<<"case 1 "<<endLog();
-                                    // inputColor(0) = (unsigned int)(std::min(255.0f,std::max(0.0f,float(inputColor(0))/camera_K[camNum])));
-                                    // inputColor(1) = (unsigned int)(std::min(255.0f,std::max(0.0f,float(inputColor(1))/camera_K[camNum])));
-                                    // inputColor(2) = (unsigned int)(std::min(255.0f,std::max(0.0f,float(inputColor(2))/camera_K[camNum])));
-                                    
-                                    int R = inputColor(0);
-                                    int G = inputColor(1);
-                                    int B = inputColor(2);
-                                    // colorsTotal[current_color_index](3*myCam)=R;
-                                    // colorsTotal[current_color_index](3*myCam+1)=G;
-                                    // colorsTotal[current_color_index](3*myCam+2)=B;
-
-                                    colorsTotal.at<int32_t>(current_color_index,3*myCam)=R;
-                                    colorsTotal.at<int32_t>(current_color_index,3*myCam+1)=G;
-                                    colorsTotal.at<int32_t>(current_color_index,3*myCam+2)=B;
-                                // }
-                                // log(ALWAYS)<<"end"<<endLog();
-  
-                            }
-                        }
-                        // log(ALWAYS)<<"edge7"<<endLog();
-                    }
-                }
-            }
-            // log(ALWAYS)<<"tri "<<tri<<": ok?"<<endLog();
-            //Update triangle
-            triangle.ref = point_indices[triangle.ref];
-            triangle.edge1 = point_indices[triangle.edge1];
-            triangle.edge2 = point_indices[triangle.edge2];
-            // log(ALWAYS)<<"wololo"<<endLog();
-            in_faces.push_back(triangle);
-            out_face_res.push_back(faceRes);
-             // log(ALWAYS)<<"wololo2"<<endLog();
-            out_face_color_ind.push_back(face_color_index);
-            out_edge_color_ind.push_back(edge_ind);
-             // log(ALWAYS)<<"wololo3"<<endLog();
-
-        }
-    }
-    fout<<"Dead pixels remaining: "<<uselessPixels<<std::endl;
-
-    log(ALWAYS)<<"Dead pixels remaining: "<<uselessPixels<<endLog();
-    
-    
-    log(ALWAYS)<<"[SpaceTimeSampler] : triangles size "<<triangles.size()<<endLog();
-    log(ALWAYS)<<"[SpaceTimeSampler] : in_faces size "<<in_faces.size()<<endLog();
-
-    time_diff = boost::posix_time::microsec_clock::local_time() - time_begin;
-    log(ALWAYS)<<"[SpaceTimeSampler] : Distribute votes on samples: "<<int(float(time_diff.total_milliseconds())/1000)<<" s"<<endLog();
-
-
-    // ***********************************************
-    // ***              1ST STEP                   ***
-    // ***********************************************
-    // out_colors.resize(color_index_pointer);
-    // color_map_votes.resize(color_index_pointer);
-    // color_map_votes_weight.resize(color_index_pointer);
-
-    // colorsTotal.resize(color_index_pointer);
-    // samples_adj.resize(color_index_pointer);
-
-    log(ALWAYS)<<"colorsTotal size: "<<colorsTotal.rows<<","<<colorsTotal.cols<<endLog();
-    log(ALWAYS)<<"extract: "<<colorsTotal.row(0)<<endLog();
-    writeIntMatToFile(colorsTotal,"/morpheo-nas2/marmando/Appearance/ASR/early_tests/colorsTotal.txt");
-    return;
-
-    // log(ALWAYS)<<"Creating Mat..."<<endLog();
-    // log(ALWAYS)<<"Mat rows = "<<adjListMat.rows<<endLog();
-    // log(ALWAYS)<<"Mat cols = "<<adjListMat.cols<<endLog();
-    // // cv::Mat testMat = cv::Mat(adjListMat,cv::Rect(0,0,K,50));
-    // cv::Mat testMat = adjListMat;
-    // log(ALWAYS)<<"row example: "<<adjListMat.row(0)<<endLog();
-    // log(ALWAYS)<<"Writing..."<<endLog();
-    // writeIntMatToFile(testMat,"/morpheo-nas2/marmando/Appearance/ASR/early_tests/adjMat.txt");
-    // // writeMatToFile(out_colors,"/morpheo-nas2/marmando/Appearance/ASR/early_tests/out_colors.txt")
-    // log(ALWAYS)<<"Getting pos..."<<endLog();
-    // std::vector<Vector3f> samples_pos;
-
-    // samples_pos = in_mesh->getSamplesPosition();
-    // exportOFF(samples_pos,"/morpheo-nas2/marmando/Appearance/ASR/early_tests/samplesPos.txt");
-    // exportCOFF(samples_pos, out_colors, "/morpheo-nas2/marmando/Appearance/ASR/early_tests/samplesPosAndColor.txt");
     // out_colors[0](0)=1;
     //consistencyTest(out_colors,out_face_res,out_edge_color_ind,out_face_color_ind);
 

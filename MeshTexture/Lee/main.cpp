@@ -48,103 +48,50 @@ int main(int argc, char **argv)
         if (om.mode_ == 'C') //Color obj frames contained in Temp folder
         {
             
-            
             MySpecialMesh mesh_to_be_cleaned(hyper_volume->getFrameNumber(frame),input_name);
             hyper_volume->loadImages(frame);                           //Only load images and silhouettes in cameras
 
             int totalCamNum = hyper_volume->getNumCams();
 
             int fr, dst;
+            fr = FACE_RES_RATIO;
+            dst = DOWNSAMPLE_THRESHOLD;
+            std::string colored_output_name = (boost::format(output_name_format+"moff") % hyper_volume->getFrameNumber(frame)).str();
 
-            
-            // std::vector<int> frValues = {0,5,20,40};
-            std::vector<int> frValues = {5};
-            // std::vector<int> dstValues = {0,50,80,100,150,180};
-            // std::vector<int> dstValues = {0, 20, 30, 50};
-            std::vector<int> dstValues = {50};
-            
-            for(int frInd=0;frInd<frValues.size();++frInd)
+            if (boost::filesystem::exists(colored_output_name))
             {
-                fr = frValues[frInd];
-                for(int dstInd=0;dstInd<dstValues.size();++dstInd)
-                {
-                    dst = dstValues[dstInd];
-                    // std::string colored_output_name = (boost::format(output_name_format+std::to_string(fr)+"_"+std::to_string(dst)+".off") % hyper_volume->getFrameNumber(frame)).str();
-                    std::string colored_output_name = (boost::format(output_name_format+"moff") % hyper_volume->getFrameNumber(frame)).str();
-            
-
-                    // if (boost::filesystem::exists(colored_output_name))
-                    // {
-                    //     log(ALWAYS)<<"Skipping file "<<colored_output_name<<endLog();
-                    //     continue;
-                    // }
-                    log(ALWAYS)<<"Generating file "<<colored_output_name<<endLog();
-                    mesh_to_be_cleaned.cleanAndColor(hyper_volume, fr, dst);
-        
-                    mesh_to_be_cleaned.exportAsMOFF(colored_output_name);
-                    log(ALWAYS)<<"exported as "<<colored_output_name<<endLog();
-                }
+                log(WARN)<<"Skipping file "<<colored_output_name<<": already exists."endLog();
+                continue;
             }
 
+            log(ALWAYS)<<"Generating file "<<colored_output_name<<endLog();
+            mesh_to_be_cleaned.cleanAndColor(hyper_volume, fr, dst);
 
+            mesh_to_be_cleaned.exportAsMOFF(colored_output_name);
+            log(ALWAYS)<<"exported as "<<colored_output_name<<endLog();
 
         }
         else if(om.mode_ == 'Z')
         {
-            
-            int quantFactor = 16384;
-            // float quantMatCoefs[] = {1,0.1,0.02};
+            int quantFactor = QUANT_FACTOR;
+            float quantMatCoefs[] = {1,QUANT_MAT_L1,QUANT_MAT_L2};
+            MySpecialMesh mesh_to_be_cleaned(hyper_volume->getFrameNumber(frame),input_name);
+            log(ALWAYS)<<"mesh loaded."<<endLog();
 
-            // std::vector<int> quantFactorValues = {4096,6144,8192,12288,16384, 24576, 32768};
-            // std::vector<int> quantFactorValues = {24576, 32768};
-            // std::vector<int> quantFactorValues = {4096, 8192, 16384};
-            std::vector<int> quantFactorValues = {4096};
-            // for(quantFactor=8192;quantFactor<=16384;quantFactor+=4096)
-            for(int quantFactorInd=0;quantFactorInd<quantFactorValues.size();++quantFactorInd)
-            {
-                quantFactor = quantFactorValues[quantFactorInd];
-                for(float sF=1.0;sF<=1.0;sF+=0.3)
-                    for(float sF2=0.01;sF2<=0.01;sF2+=0.04)
-                    {
-                        float quantMatCoefs[] = {1,sF,sF2};
-                        MySpecialMesh mesh_to_be_cleaned(hyper_volume->getFrameNumber(frame),input_name);
-                        log(ALWAYS)<<"mesh loaded."<<endLog();
-                        //std::string compressed_output_name = (boost::format(output_name_format+"comp_"+std::to_string(quantFactor)+"_"+std::to_string(10*quantMatCoefs[1])+"_"+std::to_string(100*quantMatCoefs[2])+".off") % hyper_volume->getFrameNumber(frame)).str();
-                        // std::string compressed_output_name = (boost::format(output_name_format+"comp0m_%i_%.1f_%.1f.off") % hyper_volume->getFrameNumber(frame) % quantFactor % (10*quantMatCoefs[1]) %  (100*quantMatCoefs[2])).str();
-                        std::string compressed_output_name = (boost::format(output_name_format+"zoff") % hyper_volume->getFrameNumber(frame)).str();
-                        
-                        mesh_to_be_cleaned.compressColoredMesh(hyper_volume,quantFactor,quantMatCoefs);
-                        
-                        mesh_to_be_cleaned.exportAsZOFF(compressed_output_name);
-                    }
-            }
+            std::string compressed_output_name = (boost::format(output_name_format+"zoff") % hyper_volume->getFrameNumber(frame)).str();
+            mesh_to_be_cleaned.compressColoredMesh(hyper_volume,quantFactor,quantMatCoefs);
+            mesh_to_be_cleaned.exportAsZOFF(compressed_output_name);
         }
 
         else if(om.mode_ == 'X')    //compress. test. Matt
         {
-            
-            int quantFactor = 16384;
-            // float quantMatCoefs[] = {1,0.1,0.02};
-
-            // std::vector<int> quantFactorValues = {4096,6144,8192,12288,16384, 24576, 32768};
-            // std::vector<int> quantFactorValues = {24576, 32768};
-            // std::vector<int> quantFactorValues = {4096, 8192, 16384};
-            std::vector<int> quantFactorValues = {4096};
-            for(int quantFactorInd=0;quantFactorInd<quantFactorValues.size();++quantFactorInd)
-            {
-                quantFactor = quantFactorValues[quantFactorInd];
-                for(float sF=1.0;sF<=1.0;sF+=0.3)
-                    for(float sF2=0.01;sF2<=0.01;sF2+=0.04)
-                    {
-                        float quantMatCoefs[] = {1,sF,sF2};
-                        MySpecialMesh mesh_to_be_cleaned(hyper_volume->getFrameNumber(frame),input_name);
-                        log(ALWAYS)<<"mesh loaded."<<endLog();
-                        //std::string compressed_output_name = (boost::format(output_name_format+"comp_"+std::to_string(quantFactor)+"_"+std::to_string(10*quantMatCoefs[1])+"_"+std::to_string(100*quantMatCoefs[2])+".off") % hyper_volume->getFrameNumber(frame)).str();
-                        std::string compressed_output_name = (boost::format(output_name_format+"comp0m_%i_%.1f_%.1f.moff") % hyper_volume->getFrameNumber(frame) % quantFactor % (10*quantMatCoefs[1]) %  (100*quantMatCoefs[2])).str();
-                        mesh_to_be_cleaned.uncompressColoredMesh(hyper_volume,quantFactor,quantMatCoefs);
-                        mesh_to_be_cleaned.exportAsMOFF(compressed_output_name);
-                    }
-            }
+            int quantFactor = QUANT_FACTOR;
+            float quantMatCoefs[] = {1,QUANT_MAT_L1,QUANT_MAT_L2};
+            MySpecialMesh mesh_to_be_cleaned(hyper_volume->getFrameNumber(frame),input_name);
+            log(ALWAYS)<<"mesh loaded."<<endLog();
+            std::string compressed_output_name = (boost::format(output_name_format+"_extracted.moff") % hyper_volume->getFrameNumber(frame));
+            mesh_to_be_cleaned.uncompressColoredMesh(hyper_volume,quantFactor,quantMatCoefs);
+            mesh_to_be_cleaned.exportAsMOFF(compressed_output_name);
         }
     }
     return 0;
