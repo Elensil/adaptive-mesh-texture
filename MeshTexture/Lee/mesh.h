@@ -28,17 +28,26 @@ public:
 
     bool loadMOFF(const std::string moffFile, bool clear = false);
 
+    bool loadCOFF(const std::string moffFile, bool clear = false);
+
+    bool loadZOFF(const std::string moffFile, bool clear = false);
+
     /**  Cleaning */
 
     template<class PhotoUtils>
-    void cleanAndColor(const PhotoUtils *hyper_volume, int in_faceResParam = 8, int in_downsamplingThreshold = 0, int droppedCamNum = -1);
+    void cleanAndColor(const PhotoUtils *hyper_volume, int in_faceResParam = 8, int in_downsamplingThreshold = 0);
 
     template<class PhotoUtils>
     void compressColoredMesh(const PhotoUtils *hyper_volume, int quantFactor, float quantMatCoefs[]);
 
+    template<class PhotoUtils>
+    void uncompressColoredMesh(const PhotoUtils *hyper_volume, int quantFactor, float quantMatCoefs[]);
+
     /**  Export */
 
     void exportAsOBJ(std::string filename = "");
+
+    void exportAsZOFF(std::string filename)const;
 
     void exportAsCOFF(std::string filename)const;
 
@@ -50,7 +59,18 @@ public:
 
     void exportAsFullPLY(std::string filename)const;   //added by Matt
 
-    void exportAsMinPLY(std::string filename) const;
+    void exportAsMinPLY(std::string filename)const;
+
+    void exportColorGraph(std::string filename)const;
+
+    std::vector<Vector3f> getSamplesPosition();
+
+    long getSampleColorIndex( const MyTriangle &triangle,
+                                            const int tri_ind,
+                                            const int faceRes,
+                                            const int b0,
+                                            const int b1)const;
+
 
     inline unsigned int getPointSize(){return v_points_.size();}
 
@@ -59,6 +79,7 @@ public:
      */
     long int getActiveFrame()const{return active_frame_;}
     std::string getFileName()const{return s_file_name_;}
+    std::string getAppearanceFileName()const{return s_appearance_file_name_;}
     void getPointsVector(std::vector<Vector3f> &out_vec)const{out_vec = v_points_;}
     void getFacesVector(std::vector<MyTriangle> &out_vec)const{out_vec = v_faces_;}
     void getTexCoords(std::vector<Vector2f> &out_vec)const{out_vec = tex_coords_;}
@@ -67,6 +88,7 @@ public:
     void getFacesResVector(std::vector<unsigned short> &out_vec)const{out_vec = v_face_res_;}
     void getEdgesIndVector(std::vector<Vector3li> &out_vec)const{out_vec = v_edge_color_ind_;}
     void getFacesIndVector(std::vector<unsigned long> &out_vec)const{out_vec = v_face_color_ind_;}
+    void getEdgesRealColorInd(std::vector<size_t> &out_vec)const{out_vec = v_edge_real_color_ind_;}
 
     // std::vector<MyTriangle> & getRealFacesVector(){return v_faces_;}
 
@@ -87,13 +109,16 @@ public:
     void setEdgesIndVector(std::vector<Vector3li> &out_vec){v_edge_color_ind_ = out_vec;}
     void setFacesIndVector(std::vector<unsigned long> &out_vec){v_face_color_ind_ = out_vec;}
     void setColorsBitArray(std::vector<BitArray> &out_vec){v_colors_bitarray = out_vec;}
-    
+    void setEdgesRealColorInd(std::vector<size_t> &out_vec){v_edge_real_color_ind_ = out_vec;}
+    void setAdjListMat(cv::Mat &in_mat){in_mat.copyTo(adjListMat_);}
+
     private:
 
         long int active_frame_;
 
         //Mesh components
         std::string s_file_name_;
+        std::string s_appearance_file_name_;
         std::vector<Vector3f> v_points_;
         std::vector<Vector3ui> v_colors_;
         std::vector<MyTriangle> v_faces_;
@@ -109,25 +134,37 @@ public:
 
         std::vector<int32_t> v_points_separator_;
         std::vector<int32_t> v_faces_separator_;
+        cv::Mat adjListMat_;
 };
 
 template<class PhotoUtils>
-void MySpecialMesh::cleanAndColor(const PhotoUtils *hyper_volume, int in_faceResParam, int in_downsamplingThreshold, int droppedCamNum){
-    hyper_volume->colorPointCloud(this, in_faceResParam, in_downsamplingThreshold, droppedCamNum);
+void MySpecialMesh::cleanAndColor(const PhotoUtils *hyper_volume, int in_faceResParam, int in_downsamplingThreshold){
+    hyper_volume->colorPointCloud(this, in_faceResParam, in_downsamplingThreshold);
+    // hyper_volume->colorInput(this, in_faceResParam, in_downsamplingThreshold);
+    log(ALWAYS)<<"alright!"<<endLog();
 }
 
 template<class PhotoUtils>
 void MySpecialMesh::compressColoredMesh(const PhotoUtils *hyper_volume, int quantFactor, float quantMatCoefs[]){
 
     log(ALWAYS)<<"Starting compression."<<endLog();
+    hyper_volume->reIndexColors(this, 32, quantFactor, quantMatCoefs, -1);
     
-    // hyper_volume->compressColorFull(this, v_edge_real_color_ind_, 32, quantFactor, quantMatCoefs, 0);
-    hyper_volume->reIndexColors(this, v_edge_real_color_ind_, 32, quantFactor, quantMatCoefs, 0);
-    hyper_volume->compressColor(this, v_edge_real_color_ind_, 32, quantFactor, quantMatCoefs, 0);
-    hyper_volume->decodeCompressedColor(this, 32, quantFactor);
-    // hyper_volume->reIndexColors(this, v_edge_real_color_ind_, 32, quantFactor, quantMatCoefs, 0);
+    hyper_volume->compressColor(this, v_edge_real_color_ind_, 32, quantFactor, quantMatCoefs, -1);
+    
+}
 
-    
+
+
+template<class PhotoUtils>
+void MySpecialMesh::uncompressColoredMesh(const PhotoUtils *hyper_volume, int quantFactor, float quantMatCoefs[]){
+
+    log(ALWAYS)<<"Starting extraction."<<endLog();
+
+    // hyper_volume->reIndexColors(this, 32, quantFactor, quantMatCoefs, -1);
+    hyper_volume->decodeCompressedColor(this, 32, quantFactor);
+    log(ALWAYS)<<"Extraction complete."<<endLog();
+    // hyper_volume->reIndexColors(this, 32, quantFactor, quantMatCoefs, 0);
 }
 
 

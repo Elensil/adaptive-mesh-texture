@@ -87,27 +87,18 @@ cv::Mat MeshEncoder::getTriangularDCTMatrix(const int N, std::vector<int> &quant
 
 
 
-void MeshEncoder::writeJPEGMeshColor(std::map<int,cv::Mat> &dctTrianglesList, std::map<int,std::vector<float>> &quantizationTables, std::map<int,cv::Mat> &eigenVectors, std::string filePath, std::string fileName)
+void MeshEncoder::writeJPEGMeshColor(std::map<int,cv::Mat> &dctTrianglesList, std::map<int,std::vector<float>> &quantizationTables, std::map<int,cv::Mat> &eigenVectors, std::map<int,int> &quantMultipliers, std::string filePath, std::string fileName)
 {
     //open file to write in
     std::ofstream fout(filePath+fileName, std::ios::out | std::ios::binary);
     
-
-
     BitArray myBitArray(5000000);
-
-    //myBitArray.byteArray = byteArray;
-    //myBitArray.leftoverBits = 0;
-
-    //std::vector<char> myBitArray = byteArray;
 
     //write header/metadata
     //Start of Image
     myBitArray.writeBytes(m_SOI);
 
-    //Quantization tables
     
-
     //write data
     std::map<int,cv::Mat>::iterator it;
     int resNumber=0;
@@ -117,8 +108,6 @@ void MeshEncoder::writeJPEGMeshColor(std::map<int,cv::Mat> &dctTrianglesList, st
 
         int myRes = it->first;
         cv::Mat patterns = it->second;
-        //int sampNum = 3*(myRes-1)*(myRes-2)/2;
-        //int  sampNum = (myRes+2)*(myRes+1)/2 + (myRes/2+2)*(myRes/2+1);
         int sampNum = patterns.rows;
 
         //create huffman trees
@@ -178,7 +167,7 @@ void MeshEncoder::writeJPEGMeshColor(std::map<int,cv::Mat> &dctTrianglesList, st
         writeHuffTree(myBitArray, acYTree);
 
         //Writing Quantization tables
-        encodeQuantizationMatrix(myBitArray, quantizationTables[myRes], resNumber);
+        encodeQuantizationMatrix(myBitArray, quantizationTables[myRes], quantMultipliers[myRes]);
 
         //Writing eigen vectors
         encodeEigenVectors(myBitArray, eigenVectors[myRes], sampNum+1, resNumber);  //+1 for mean vector
@@ -368,189 +357,6 @@ std::vector<BitArray> MeshEncoder::getMeshBinaryColor(std::map<int,cv::Mat> &dct
     return triangleBitArray;
 }
 
-
-
-void MeshEncoder::writeJPEGMeshColor(std::map<int,std::vector<cv::Mat>> &dctTrianglesList, std::string outPath)const
-{
-    //open file to write in
-    //std::ofstream fout("/morpheo-nas2/DataKinovis/CoolCap/TaeKwondo-Thu-Feb-9-12-26-31-2017/kick540/Results/RVDs/Temp/datastreamTest.dat", std::ios::out | std::ios::binary);
-    // std::ofstream fout("/morpheo-nas2/DataKinovis/marmando_temp/Results/RVDs/Temp/datastreamTest.dat", std::ios::out | std::ios::binary);
-    std::ofstream fout(outPath + "/datastreamTest.dat", std::ios::out | std::ios::binary);
-
-
-    BitArray myBitArray(5000000);
-    
-    //Start of Image
-    myBitArray.writeBytes(m_SOI);
-
-    //write2BytesNum(myBitArray,1);                 //number of bytes (test here, 1)
-    myBitArray.writeSingleByte(0);
-    myBitArray.writeSingleByte(1);
-    
-    //write data
-    std::map<int,std::vector<cv::Mat>>::iterator it;
-
-    //loop over resolution levels
-    for(it = dctTrianglesList.begin();it!=dctTrianglesList.end();++it)
-    {
-
-        int myRes = it->first;
-        std::vector<cv::Mat> patterns = it->second;
-        int sampNum = (myRes-1)*(myRes-2)/2;
-
-        //create huffman trees
-        HuffTree dcYTree = HuffTree();
-        HuffTree acYTree = HuffTree();
-        HuffTree* myDCTree;
-        HuffTree* myACTree;
-        HuffTree dcCTree = HuffTree();
-        HuffTree acCTree = HuffTree();
-        //HuffTree dcCrTree = HuffTree();
-        //HuffTree acCrTree = HuffTree();
-
-        int patternsNum = patterns[0].cols;
-
-        int lastDcCoef=0;
-        int trailingZeros=0;
-
-        for(int ch=0;ch<3;++ch)
-        {
-            if(ch==0)       //Y channel
-            {
-                myDCTree = &dcYTree;
-                myACTree = &acYTree;
-            }
-            else
-            {
-                myDCTree = &dcCTree;
-                myACTree = &acCTree;
-            }
-            for(int i=0;i<patternsNum;++i)      
-            {
-                for(int j=0;j<sampNum;++j)
-                {
-
-                    if(myBitArray.getByteSize()>1000000)
-                    {
-                        goto writingFile;
-                    }
-                    if(j==0)        //DC coef
-                    {
-                        //log(ALWAYS)<<"writing DC coef "<<int(patterns.at<float>(j,i))<<", previous coef: "<<lastDcCoef<<", (i,j) = ("<<i<<","<<j<<")"<<endLog();
-                        addDCCoef(int(patterns[ch].at<float>(j,i))-lastDcCoef, *myDCTree);    //needs to be per channel?
-                        lastDcCoef = int(patterns[ch].at<float>(j,i));
-                    }
-                    else                        //AC coef
-                    {
-                        if(int(patterns[ch].at<float>(j,i))==0)
-                        {
-                            if(j==(sampNum-1))        //end of block, no need to write all the zeros
-                            {
-                                //log(ALWAYS)<<"writing EOB"<<endLog();
-                                //myBitArray.writeBytes(m_EOB);
-                                (*myACTree).addOccurences((unsigned char)0,1);
-                                trailingZeros=0;
-                            }
-                            else
-                            {
-                                ++trailingZeros;
-                            }
-                        }
-                        else
-                        {
-                            //log(ALWAYS)<<"writing AC coef "<<int(patterns.at<float>(j,i))<<" with "<<trailingZeros<<" trailing zeros"<<endLog();
-                            addACCoef(int(patterns[ch].at<float>(j,i)), trailingZeros, *myACTree);
-                            trailingZeros=0;
-                        }
-                    }
-                }
-
-            }
-        }
-        //log(ALWAYS)<<"Resolution level:"<<myRes<<endLog();
-        //log(ALWAYS)<<"DC Y Tree:"<<endLog();
-        dcYTree.computeHuffmanTable();
-        //log(ALWAYS)<<"AC Y Tree:"<<endLog();
-        acYTree.computeHuffmanTable();
-
-
-        //recompute everything
-        std::vector<int>lastDcCoef3={0,0,0};
-        trailingZeros=0;
-
-        for(int i=0;i<patternsNum;++i)      
-        {
-
-            for(int ch=0;ch<3;++ch)
-            {
-                if(ch==0)       //Y channel
-                {
-                    myDCTree = &dcYTree;
-                    myACTree = &acYTree;
-                }
-                else
-                {
-                    myDCTree = &dcCTree;
-                    myACTree = &acCTree;
-                }
-                for(int j=0;j<sampNum;++j)
-                {
-
-                    if(myBitArray.getByteSize()>1000000)
-                    {
-                        goto writingFile;
-                    }
-                    if(j==0)        //DC coef
-                    {
-
-                        //log(ALWAYS)<<"writing DC coef "<<int(patterns.at<float>(j,i))<<", previous coef: "<<lastDcCoef<<", (i,j) = ("<<i<<","<<j<<")"<<endLog();
-                        writeCodedDCCoef(myBitArray, int(patterns[ch].at<float>(j,i))-lastDcCoef3[ch], *myDCTree);    //needs to be per channel?
-                        //log(ALWAYS)<<"Byte size: "<<myBitArray.getByteSize()<<endLog();
-                        //log(ALWAYS)<<"DC coef written"<<endLog();
-                        lastDcCoef3[ch] = int(patterns[ch].at<float>(j,i));
-                    }
-                    else                        //AC coef
-                    {
-                        if(int(patterns[ch].at<float>(j,i))==0)
-                        {
-                            if(j==(sampNum-1))        //end of block, no need to write all the zeros
-                            {
-                                //log(ALWAYS)<<"writing EOB"<<endLog();
-                                //myBitArray.writeBytes(m_EOB);
-                                myBitArray.writeBits((*myACTree).getCodedByte(0),(*myACTree).getBitNum(0));
-                                trailingZeros=0;
-                            }
-                            else
-                            {
-                                ++trailingZeros;
-                            }
-                        }
-                        else
-                        {
-                            //log(ALWAYS)<<"writing AC coef "<<int(patterns.at<float>(j,i))<<" with "<<trailingZeros<<" trailing zeros"<<endLog();
-                            writeCodedACCoef(myBitArray, int(patterns[ch].at<float>(j,i)), trailingZeros, *myACTree);
-                            trailingZeros=0;
-                        }
-                    }
-                }
-            }
-
-        }
-
-
-    }
-    writingFile:
-    //log(ALWAYS)<<"myBitArray size: "<<myBitArray.getByteSize()<<endLog();
-    myBitArray.padLastByte();
-    std::vector<unsigned char> byteArray;
-    byteArray = myBitArray.getWrittenBytes();
-    //log(ALWAYS)<<"myBitArray size: "<<myBitArray.getByteSize()<<endLog();
-    //log(ALWAYS)<<"byteArray size: "<<byteArray.size()<<" ("<<sizeof(byteArray[0])<<")"<<endLog();
-    fout.write((char*)&byteArray[0],byteArray.size());
-
-    //close file
-    fout.close();
-}
 
 
 std::vector<BitArray> MeshEncoder::getMeshBinaryColor(std::map<int,std::vector<cv::Mat>> &dctTrianglesList,int trianglesNumber)const
@@ -841,7 +647,7 @@ void MeshEncoder::writeCodedACCoef(BitArray &myBitArray, int myCoef, int trailin
     }
 }
 
-std::map<int,cv::Mat> MeshEncoder::decodeCompressedData(std::map<int,cv::Mat> &resPCAEigenVectors, std::string filePath, std::string fileName)
+std::map<int,cv::Mat> MeshEncoder::decodeCompressedData(std::map<int,cv::Mat> &resPCAEigenVectors, std::string filePath)
 {
 	//decode header.
 	//Get Huffman table(s) and quantization matrix(ces).
@@ -852,7 +658,7 @@ std::map<int,cv::Mat> MeshEncoder::decodeCompressedData(std::map<int,cv::Mat> &r
 	//BitArray bitStream = *test_bit_array;
 	
     // BitArray bitStream = actual_bit_array;
-    BitArray bitStream = BitArray(filePath+fileName);
+    BitArray bitStream = BitArray(filePath);
 
 	log(ALWAYS)<<"Decoding data..."<<endLog();
 
@@ -898,6 +704,7 @@ std::map<int,cv::Mat> MeshEncoder::decodeCompressedData(std::map<int,cv::Mat> &r
 	std::vector<std::vector<int> > pcaColorsV;
 	std::vector<float> myQT;
 
+    int quantMultiplier=0;
 	//for each byte
 	while(bitStream.getRemainingBytesNumber()>0)
 	{
@@ -929,7 +736,7 @@ std::map<int,cv::Mat> MeshEncoder::decodeCompressedData(std::map<int,cv::Mat> &r
 						{
 							for(int j=0;j<tempMat.cols;++j)
 							{
-								tempMat.at<float>(i,j)=float(pcaColorsV[i][j])*float(myQT[j]);
+								tempMat.at<float>(i,j)=float(pcaColorsV[i][j])*float(myQT[j])/float(quantMultiplier);
 							}
 						}
 						resPCAVectors[curRes] = tempMat;
@@ -962,7 +769,8 @@ std::map<int,cv::Mat> MeshEncoder::decodeCompressedData(std::map<int,cv::Mat> &r
 					curACTree = readHuffTree(bitStream);
 
 					
-					int myQTNumber = readQuantizationMatrix(bitStream,myQT);
+					// int myQTNumber = readQuantizationMatrix(bitStream,myQT);
+                    quantMultiplier = readQuantizationMatrix(bitStream,myQT);
 					coefNumber = myQT.size();
 
                     int colorSpaceSize = (curRes+2)*(curRes+1)/2 + (curRes/2+2)*(curRes/2+1)-9;
@@ -1066,7 +874,7 @@ std::map<int,cv::Mat> MeshEncoder::decodeCompressedData(std::map<int,cv::Mat> &r
 		for(int j=0;j<tempMat.cols;++j)
 		{
 			//tempMat.at<float>(i,j)=float(pcaColorsV[i][j]);
-			tempMat.at<float>(i,j)=float(pcaColorsV[i][j])*float(myQT[j]);
+			tempMat.at<float>(i,j)=float(pcaColorsV[i][j])*float(myQT[j])/float(quantMultiplier);
 		}
 	}
 	resPCAVectors[curRes] = tempMat;
@@ -1289,7 +1097,7 @@ void MeshEncoder::writeHuffTree(BitArray &myBitArray, HuffTree &myHT)const
 	}
 }
 
-void MeshEncoder::encodeQuantizationMatrix(BitArray &bitStream, std::vector<float> quantMat, int qtNumber = 0)
+void MeshEncoder::encodeQuantizationMatrix(BitArray &bitStream, std::vector<float> quantMat, int quantMultiplier)
 {
 	//write marker
 	bitStream.writeBytes(m_DQT);
@@ -1297,12 +1105,18 @@ void MeshEncoder::encodeQuantizationMatrix(BitArray &bitStream, std::vector<floa
 	int matLength = quantMat.size();
 	int segmentLength = matLength+2+1;
 	bitStream.writeBits(segmentLength,16);
-	//write table info (QT Number, QT Precision)
-	unsigned char qtInfo = qtNumber<<4;
-	unsigned char qtPrecision = 1;		//what is this?
-	qtInfo+=qtPrecision;
-	bitStream.writeSingleByte(qtInfo);
-	//write matrix
+
+    //Matt - 10/19: Replace table info byte (not used? what's it for?) by a double byte value, encoding multiplying factor for quant matrix value
+        	// //write table info (QT Number, QT Precision)
+        	// unsigned char qtInfo = qtNumber<<4;
+        	// unsigned char qtPrecision = 1;		//what is this?
+        	// qtInfo+=qtPrecision;
+        	// bitStream.writeSingleByte(qtInfo);
+	//write quantMultiplier
+    // Temp, easy solution: need to think about its distribution, and how to encode it efficiently.
+    bitStream.writeBits(quantMultiplier,16);
+
+    //write matrix
 	for(int i=0;i<matLength;++i)
 	{
 		unsigned char coef = (unsigned char)(quantMat[i]);
@@ -1371,10 +1185,14 @@ int MeshEncoder::readQuantizationMatrix(BitArray &bitStream, std::vector<float> 
 	//read size (2 bytes)
 	int dqt_size = bitStream.readBitsInt(16);
 	//log(ALWAYS)<<"DQT size: "<<dqt_size<<endLog();
-	//read table info
-	int qtInfo = bitStream.readOneByte();
-	int qtNumber = qtInfo / 16;
-	int qtPrecision = qtInfo % 16;
+	
+    //As of 10/19, table info not written (unused). Replaced by a two-bytes value for quantMultiplier (to be returned by the main function)
+     //    //read table info
+    	// int qtInfo = bitStream.readOneByte();
+    	// int qtNumber = qtInfo / 16;
+    	// int qtPrecision = qtInfo % 16;
+
+    int quantMultiplier = bitStream.readBitsInt(16);
 
 	//read table
 	int tableLength = dqt_size-3;
@@ -1385,7 +1203,8 @@ int MeshEncoder::readQuantizationMatrix(BitArray &bitStream, std::vector<float> 
 		float coef = float(bitStream.readOneByte());
 		out_QT.push_back(coef);
 	}
-	return qtNumber;  
+	// return qtNumber;
+    return quantMultiplier;  
 }
 
 int MeshEncoder::readPCAEigenVectors(BitArray &bitStream, cv::Mat &eigenVectors)

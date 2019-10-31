@@ -35,16 +35,6 @@ public:
 
     inline bool isImageSequenceDefined() const {return !s_images_sequence_.empty();}
 
-    boost::optional<bool> isInsideSilhouette(const int &y, const int &x) const;
-
-    template<class InVec2>
-    inline boost::optional<bool> isInsideSilhouette(const InVec2 &in) const{return isInsideSilhouette(in(0),in(1));}
-
-    boost::optional<bool> isInsideShrunkSilhouette(const int &y, const int &x) const;
-
-    template<class InVec2>
-    inline boost::optional<bool> isInsideShrunkSilhouette(const InVec2 &in) const{return isInsideShrunkSilhouette(in(0),in(1));}
-
     ///Setters
     inline void setIndex(unsigned int index){u8_camera_index_ = index;}
 
@@ -92,8 +82,45 @@ public:
     template<class InVec2, class OutColor>
     inline bool getPixelColor(const InVec2 &tex_coords, OutColor &out_color)const { //row first : (y,x)
         bool out = true;
-        if(tex_coords(0) > 0 && tex_coords(0) < loaded_image_.size().height && tex_coords(1) > 0.0 && tex_coords(1) < loaded_image_.size().width  )
+        if(tex_coords(0) >= 0 && tex_coords(0) < loaded_image_.size().height && tex_coords(1) >= 0.0 && tex_coords(1) < loaded_image_.size().width  )
             out_color = loaded_image_.at<OutColor>(tex_coords(0),tex_coords(1));
+        else
+            out = false;
+        return out;
+    }
+
+    template<class InVec2, class OutColor>
+    inline bool getPixelColorDS(const InVec2 &tex_coords, OutColor &out_color)const { //row first : (y,x)
+        bool out = true;
+        if(tex_coords(0) >= 0 && tex_coords(0) < loaded_image_.size().height && tex_coords(1) >= 0.0 && tex_coords(1) < loaded_image_.size().width  )
+        {
+            int x0 = tex_coords(0)-(tex_coords(0)%2);
+            int y0 = tex_coords(1)-(tex_coords(1)%2);
+            float R = 0.0;
+            float G = 0.0;
+            float B = 0.0;
+            OutColor tempColor;
+            tempColor = loaded_image_.at<OutColor>(x0,y0);
+            R += float(tempColor(0));
+            G += float(tempColor(1));
+            B += float(tempColor(2));
+            tempColor = loaded_image_.at<OutColor>(x0+1,y0);
+            R += float(tempColor(0));
+            G += float(tempColor(1));
+            B += float(tempColor(2));
+            tempColor = loaded_image_.at<OutColor>(x0,y0+1);
+            R += float(tempColor(0));
+            G += float(tempColor(1));
+            B += float(tempColor(2));
+            tempColor = loaded_image_.at<OutColor>(x0+1,y0+1);
+            R += float(tempColor(0));
+            G += float(tempColor(1));
+            B += float(tempColor(2));
+            R /=4;
+            G /=4;
+            B /=4;
+            out_color = OutColor(int(R),int(G),int(B));
+        }
         else
             out = false;
         return out;
@@ -184,19 +211,12 @@ private:
     //! Loaded image
     cv::Mat loaded_image_;
 
-    //! Loaded Silhouette
-    cv::Mat loaded_silhouette_;
-    cv::Mat loaded_shrunk_silhouette_;
-
     //! Super pixel image decomposition
     bool is_slic_defined_;
     cv::Ptr<cv::ximgproc::SuperpixelSLIC> slic_clustering_;
 
     //! Load Projection Matrix File
     void loadMatFile(const std::string &projection_matrix_file);
-
-    //! Set silhouette from Black Pixels
-    void set_silhouette_from_black_pixels();
 
 };
 

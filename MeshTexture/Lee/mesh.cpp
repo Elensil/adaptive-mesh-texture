@@ -5,6 +5,11 @@
 MySpecialMesh::MySpecialMesh(long int frame, std::string filename):active_frame_(frame),s_file_name_(filename){
     if(!filename.empty())
     {
+
+        std::string rootname;// = filename.substr(0,filename.length()-4);
+        
+
+
         std::string format = boost::filesystem::extension(filename);
         format = format.substr(1);
         if(!format.compare("obj"))
@@ -18,11 +23,39 @@ MySpecialMesh::MySpecialMesh(long int frame, std::string filename):active_frame_
         {
             if(!loadMOFF(filename))
             {
+                if(!loadZOFF(filename))
+                {
+                    log(ERROR)<<"[Mesh OFF loader] Error: Could not load OFF file."<<endLog();
+                }
+            }
+        }
+        else if(!format.compare("zoff"))
+        {
+            if(!loadZOFF(filename))
+            {
                 log(ERROR)<<"[Mesh OFF loader] Error: Could not load OFF file."<<endLog();
             }
         }
+
         else
             log(ERROR)<<"[MySpecialMesh()] Error, unknown input file format."<<endLog();
+
+        
+        if(s_appearance_file_name_.empty())
+        {
+            std::size_t lastDot = filename.rfind(".");
+            if(lastDot!=std::string::npos)
+            {
+                rootname = filename.substr(0,lastDot);
+            }
+            // s_appearance_file_name_ = rootname + ".dat";
+            std::string appearancefilenamePath = rootname + ".dat";
+            //extract filename of png file from path
+            std::size_t lastSlash = appearancefilenamePath.rfind("/");
+            if (lastSlash!=std::string::npos)
+                s_appearance_file_name_ = appearancefilenamePath.substr(lastSlash);
+        }
+
     }
 }
 
@@ -551,6 +584,335 @@ bool MySpecialMesh::loadMOFF(const std::string moffFile, bool clear){
     return isfile_readable;
 }
 
+bool MySpecialMesh::loadCOFF(const std::string moffFile, bool clear){
+    std::cout<<"Reading file "<<moffFile<<std::endl;
+    if(clear)
+    {
+        v_points_.clear();
+        v_faces_.clear();
+        v_points_separator_.clear();
+        v_faces_separator_.clear();
+        v_colors_.clear();
+        v_edge_color_ind_.clear();
+        v_face_color_ind_.clear();
+        v_face_res_.clear();
+        v_edge_real_color_ind_.clear();
+    }
+    v_points_separator_.push_back(v_points_.size());//Index of the first vertex of this mesh
+    v_faces_separator_.push_back(v_faces_.size());//Index of the first face of this mesh
+    std::vector<int32_t> old_indices;
+    int32_t count = 0;
+
+    std::vector<int32_t> nan_points;
+
+    bool isfile_readable = false;
+
+    int matches = 0;
+
+    //Face managment variables (only working for triangles) TBD: improve this
+    int32_t vertexIndex[3];
+
+    FILE * file = fopen(moffFile.c_str(), "r");
+    if( file == NULL ){
+        printf("Could not open the .off file !\n");
+        return false;
+    }
+
+    // ---- Read header ----
+    char fileHeader[128];
+    int res = fscanf(file, "%s\n", fileHeader);
+    if(res==EOF)
+        return false;
+    if(strcmp(fileHeader,"COFF")!=0)
+    {
+        printf("Header does not match mesh colors off format!\n");
+        return false;
+    }
+
+    // char colormapName[128];
+    // res = fscanf(file, "%s\n", colormapName);
+    // if(res==EOF)
+    //     return false;
+    // //TODO: check png extension?
+
+    // //extract filename of png file from path
+    // std::size_t lastSlash = moffFile.rfind("/");
+    // std::string pngfilename;
+    // if (lastSlash!=std::string::npos)
+    //     pngfilename = moffFile.substr(0,lastSlash) + "/" + colormapName;
+    // log(ALWAYS)<<"color file: "<<pngfilename<<endLog();
+    // //read colormap
+    // cv::Mat cvColorMat;
+    // cv::Mat cvImage = cv::imread(pngfilename, CV_LOAD_IMAGE_COLOR);
+    // cvImage.convertTo(cvColorMat, CV_8UC3);
+    // int colormapSize = cvColorMat.rows * cvColorMat.cols;
+    // log(ALWAYS)<<"colormap size = "<<colormapSize<<endLog();
+    // v_colors_.reserve(colormapSize);
+    // for(int i=0;i<cvColorMat.rows;++i)
+    // {
+    //     for(int j=0;j<cvColorMat.cols;++j)
+    //     {
+    //         Vector3ui myColor = Vector3ui(cvColorMat.at<cv::Vec3b>(i,j)[2],cvColorMat.at<cv::Vec3b>(i,j)[1],cvColorMat.at<cv::Vec3b>(i,j)[0]);
+    //         v_colors_.push_back(myColor);
+    //     }
+    // }
+    // log(ALWAYS)<<"colormap size = "<<v_colors_.size()<<endLog();
+
+    int vertexNumber, edgeNumber, faceNumber;
+    res = fscanf(file,"%d %d %d\n", &vertexNumber, &faceNumber, &edgeNumber);
+
+    log(ALWAYS)<<"Loading coff file: "<<vertexNumber<<" vertices, "<<faceNumber<<" faces."<<endLog();
+    v_colors_.reserve(vertexNumber);
+    //read vertices
+    for(int vNum=0;vNum<vertexNumber;++vNum)
+    {
+        isfile_readable = true;
+        Vector3f vertex;
+        Vector3f vColor;
+        float alpha;
+        int vertexColorIndex;
+        matches = fscanf(file, "%f %f %f %f %f %f %f\n", &vertex[0], &vertex[1], &vertex[2], &vColor[0], &vColor[1], &vColor[2], &alpha );
+        if ((matches == 6)||(matches==7))       //RGB or RGBa color
+        {
+            if(vertex(0) != vertex(0) || vertex(1) != vertex(1) || vertex(2) != vertex(2))
+            {
+                nan_points.push_back(v_points_.size());
+                old_indices.push_back(-1);
+            }
+            else
+            {
+                v_points_.push_back(vertex);
+                if(vColor[0]<1)
+                {
+                    vColor = vColor * 255;
+                }
+                Vector3ui myColor = Vector3ui(int(vColor[0]),int(vColor[1]),int(vColor[2]));
+                v_colors_.push_back(myColor);
+                old_indices.push_back(count++);
+            }
+        }
+        else
+            isfile_readable = false;
+    }
+
+    log(ALWAYS)<<"vertices read. "<<v_points_.size()<<" points added, "<<nan_points.size()<<" nan points"<<endLog();
+
+    for(int fNum=0; fNum<faceNumber;++fNum)
+    {
+        int faceVertexNumber;
+        int faceRes;
+        Vector3li edgeIndices;
+        long faceIndex;
+        matches = fscanf(file, " %d %d %d %d\n", &faceVertexNumber, &vertexIndex[0], &vertexIndex[1], &vertexIndex[2]);
+        if (matches == 4)
+        {
+            //first part copied from below, with small addition for face texture indices
+            if (    (unsigned int)(vertexIndex[0] + v_points_separator_[v_points_separator_.size()-1]) > v_points_.size()+nan_points.size() ||
+                    (unsigned int)(vertexIndex[1] + v_points_separator_[v_points_separator_.size()-1]) > v_points_.size()+nan_points.size() ||
+                    (unsigned int)(vertexIndex[2] + v_points_separator_[v_points_separator_.size()-1]) > v_points_.size()+nan_points.size() ){
+                std::cout<<"Error! Vertex index out of range: nb_points "<<v_points_.size()<<std::endl;
+
+                std::cout<<"Indices: "<<vertexIndex[0] <<" "<< vertexIndex[1] <<" "<<vertexIndex[2]<<std::endl;
+                return false;
+            }
+            else{ //TBD: add non triangular faces management
+                bool is_triangle_safe = true;
+                const unsigned long long int temp_index_ref = vertexIndex[0] + v_points_separator_[v_points_separator_.size()-1]; //From 1 to 0 starting point
+                const unsigned long long int temp_index_edge1 = vertexIndex[1] + v_points_separator_[v_points_separator_.size()-1];
+                const unsigned long long int temp_index_edge2 = vertexIndex[2] + v_points_separator_[v_points_separator_.size()-1];
+                for(int32_t j = 0; j < nan_points.size(); ++j)
+                {
+                    if(nan_points[j] == temp_index_ref || nan_points[j] == temp_index_edge1  || nan_points[j] == temp_index_edge2  )
+                    {
+                        is_triangle_safe = false;
+                        break;
+                    }
+                }
+                if(is_triangle_safe)
+                {
+                    MyTriangle triangle;
+                    triangle.ref = old_indices[vertexIndex[0]]   + v_points_separator_[v_points_separator_.size()-1];
+                    triangle.edge1 = old_indices[vertexIndex[1]] + v_points_separator_[v_points_separator_.size()-1];
+                    triangle.edge2 = old_indices[vertexIndex[2]] + v_points_separator_[v_points_separator_.size()-1];
+                    v_faces_.push_back(triangle);
+                }
+            }
+        }
+        else{
+            std::cout<<"File can't be read by this simple parser : ( Try exporting with other options, or check if faces are triangles... others not managed yet)"<<std::endl;
+            return false;
+        }
+    }
+
+    std::cout<<"[MySpecialMesh] Loaded "<<v_points_.size()<<" points, "<< v_faces_.size()<<" triangles."<<std::endl;
+    if(!nan_points.empty())
+        std::cout<<"[MySpecialMesh] Warning: Found "<< nan_points.size() <<" NAN coordinates, cleaned faces and points accordingly."<<std::endl<<std::endl;
+
+    return isfile_readable;
+}
+
+bool MySpecialMesh::loadZOFF(const std::string moffFile, bool clear){
+    std::cout<<"Reading file "<<moffFile<<std::endl;
+    if(clear)
+    {
+        v_points_.clear();
+        v_faces_.clear();
+        v_points_separator_.clear();
+        v_faces_separator_.clear();
+        v_colors_.clear();
+        v_edge_color_ind_.clear();
+        v_face_color_ind_.clear();
+        v_face_res_.clear();
+        v_edge_real_color_ind_.clear();
+    }
+    v_points_separator_.push_back(v_points_.size());//Index of the first vertex of this mesh
+    v_faces_separator_.push_back(v_faces_.size());//Index of the first face of this mesh
+    std::vector<int32_t> old_indices;
+    int32_t count = 0;
+
+    std::vector<int32_t> nan_points;
+
+    bool isfile_readable = false;
+
+    int matches = 0;
+
+    //Face managment variables (only working for triangles) TBD: improve this
+    int32_t vertexIndex[3];
+
+    FILE * file = fopen(moffFile.c_str(), "r");
+    if( file == NULL ){
+        printf("Could not open the .off file !\n");
+        return false;
+    }
+
+    // ---- Read header ----
+    char fileHeader[128];
+    int res = fscanf(file, "%s\n", fileHeader);
+    if(res==EOF)
+        return false;
+    if(strcmp(fileHeader,"ZOFF")!=0)
+    {
+        printf("Header does not match mesh colors off format!\n");
+        return false;
+    }
+
+    char colormapName[128];
+    res = fscanf(file, "%s\n", colormapName);
+    if(res==EOF)
+        return false;
+
+    //extract filename of dat file from path
+    std::size_t lastSlash = moffFile.rfind("/");
+    std::string datfilename;
+    if (lastSlash!=std::string::npos)
+        datfilename = moffFile.substr(0,lastSlash) + "/" + colormapName;
+    log(ALWAYS)<<"color file: "<<datfilename<<endLog();
+    
+    s_appearance_file_name_ = datfilename;
+
+    int vertexNumber, edgeNumber, faceNumber;
+    res = fscanf(file,"%d %d %d\n", &vertexNumber, &faceNumber, &edgeNumber);
+
+    log(ALWAYS)<<"Loading coff file: "<<vertexNumber<<" vertices, "<<faceNumber<<" faces."<<endLog();
+    v_colors_.reserve(vertexNumber);
+    //read vertices
+    bool isColorFloat = false;
+    for(int vNum=0;vNum<vertexNumber;++vNum)
+    {
+        isfile_readable = true;
+        Vector3f vertex;
+        Vector3f vColor;
+        float alpha;
+        int vertexColorIndex;
+        matches = fscanf(file, "%f %f %f %f %f %f %f\n", &vertex[0], &vertex[1], &vertex[2], &vColor[0], &vColor[1], &vColor[2], &alpha );
+        
+        if ((matches == 6)||(matches==7))       //RGB or RGBa color
+        {
+            if(vertex(0) != vertex(0) || vertex(1) != vertex(1) || vertex(2) != vertex(2))
+            {
+                nan_points.push_back(v_points_.size());
+                old_indices.push_back(-1);
+            }
+            else
+            {
+                v_points_.push_back(vertex);
+                if(vNum==0)
+                {
+                    if(vColor[0]<1)
+                    {
+                        isColorFloat=true;
+                    }
+                }
+                if(isColorFloat)
+                {
+                    vColor = vColor * 255;
+                }
+
+                Vector3ui myColor = Vector3ui(int(vColor[0]+0.5f),int(vColor[1]+0.5f),int(vColor[2]+0.5f));
+                v_colors_.push_back(myColor);
+                old_indices.push_back(count++);
+            }
+        }
+        else
+            isfile_readable = false;
+    }
+
+    log(ALWAYS)<<"vertices read. "<<v_points_.size()<<" points added, "<<nan_points.size()<<" nan points"<<endLog();
+
+    for(int fNum=0; fNum<faceNumber;++fNum)
+    {
+        int faceVertexNumber;
+        int faceRes;
+        Vector3li edgeIndices;
+        long faceIndex;
+        matches = fscanf(file, " %d %d %d %d\n", &faceVertexNumber, &vertexIndex[0], &vertexIndex[1], &vertexIndex[2]);
+        if (matches == 4)
+        {
+            //first part copied from below, with small addition for face texture indices
+            if (    (unsigned int)(vertexIndex[0] + v_points_separator_[v_points_separator_.size()-1]) > v_points_.size()+nan_points.size() ||
+                    (unsigned int)(vertexIndex[1] + v_points_separator_[v_points_separator_.size()-1]) > v_points_.size()+nan_points.size() ||
+                    (unsigned int)(vertexIndex[2] + v_points_separator_[v_points_separator_.size()-1]) > v_points_.size()+nan_points.size() ){
+                std::cout<<"Error! Vertex index out of range: nb_points "<<v_points_.size()<<std::endl;
+
+                std::cout<<"Indices: "<<vertexIndex[0] <<" "<< vertexIndex[1] <<" "<<vertexIndex[2]<<std::endl;
+                return false;
+            }
+            else{ //TBD: add non triangular faces management
+                bool is_triangle_safe = true;
+                const unsigned long long int temp_index_ref = vertexIndex[0] + v_points_separator_[v_points_separator_.size()-1]; //From 1 to 0 starting point
+                const unsigned long long int temp_index_edge1 = vertexIndex[1] + v_points_separator_[v_points_separator_.size()-1];
+                const unsigned long long int temp_index_edge2 = vertexIndex[2] + v_points_separator_[v_points_separator_.size()-1];
+                for(int32_t j = 0; j < nan_points.size(); ++j)
+                {
+                    if(nan_points[j] == temp_index_ref || nan_points[j] == temp_index_edge1  || nan_points[j] == temp_index_edge2  )
+                    {
+                        is_triangle_safe = false;
+                        break;
+                    }
+                }
+                if(is_triangle_safe)
+                {
+                    MyTriangle triangle;
+                    triangle.ref = old_indices[vertexIndex[0]]   + v_points_separator_[v_points_separator_.size()-1];
+                    triangle.edge1 = old_indices[vertexIndex[1]] + v_points_separator_[v_points_separator_.size()-1];
+                    triangle.edge2 = old_indices[vertexIndex[2]] + v_points_separator_[v_points_separator_.size()-1];
+                    v_faces_.push_back(triangle);
+                }
+            }
+        }
+        else{
+            std::cout<<"File can't be read by this simple parser : ( Try exporting with other options, or check if faces are triangles... others not managed yet)"<<std::endl;
+            return false;
+        }
+    }
+
+    std::cout<<"[MySpecialMesh] Loaded "<<v_points_.size()<<" points, "<< v_faces_.size()<<" triangles."<<std::endl;
+    if(!nan_points.empty())
+        std::cout<<"[MySpecialMesh] Warning: Found "<< nan_points.size() <<" NAN coordinates, cleaned faces and points accordingly."<<std::endl<<std::endl;
+
+    return isfile_readable;
+}
+
 void MySpecialMesh::exportAsOBJ(std::string filename){
 
     if(filename.empty())
@@ -577,8 +939,8 @@ void MySpecialMesh::exportAsOBJ(std::string filename){
 void MySpecialMesh::exportAsCOFF(std::string filename) const{
     if(filename.empty())
         filename = s_file_name_;
-    if(v_colors_.size() != v_points_.size())
-        std::cout<<"[MySpecialMesh::exportAsCOFF()] Color Error."<<std::endl;
+    // if(v_colors_.size() != v_points_.size())
+    //     std::cout<<"[MySpecialMesh::exportAsCOFF()] Color Error."<<std::endl;
 
     std::ofstream outFile;
     outFile.open(filename);
@@ -605,12 +967,51 @@ void MySpecialMesh::exportAsCOFF(std::string filename) const{
     outFile.close();
 }
 
+void MySpecialMesh::exportAsZOFF(std::string filename) const{
+    if(filename.empty())
+        filename = s_file_name_;
+
+    // if(v_colors_.size() != v_points_.size())
+    //     std::cout<<"[MySpecialMesh::exportAsCOFF()] Color Error."<<std::endl;
+    std::string rootname = filename.substr(0,filename.length()-5);
+    std::string appearancefilenamePath = rootname + ".dat";
+    //extract filename of png file from path
+    std::size_t lastSlash = appearancefilenamePath.rfind("/");
+    if (lastSlash!=std::string::npos)
+        appearancefilenamePath = appearancefilenamePath.substr(lastSlash);
+
+    std::ofstream outFile;
+    outFile.open(filename);
+
+    if(outFile.is_open())
+    {
+        outFile << "ZOFF"<<std::endl;
+        outFile << appearancefilenamePath<<std::endl;
+        outFile << v_points_.size()<<" "<<v_faces_.size()<<" 0"<<std::endl;
+        for(int32_t point_it = 0 ; (unsigned long int)point_it <v_points_.size() ; ++point_it)
+            outFile<< v_points_[point_it](0)
+                      <<" "<< v_points_[point_it](1)
+                        <<" "<< v_points_[point_it](2)
+                          <<" "<< v_colors_[point_it](0)/255.0
+                            <<" "<< v_colors_[point_it](1)/255.0
+                              <<" "<< v_colors_[point_it](2)/255.0
+                                <<" 1.0"<< std::fixed <<std::endl;
+        for(std::vector<MyTriangle>::const_iterator v_faces_it = v_faces_.begin(); v_faces_it != v_faces_.end(); ++v_faces_it)
+            outFile<<"3 "<< v_faces_it->ref <<" "<< v_faces_it->edge1 <<" "<< v_faces_it->edge2 <<std::endl;
+    }
+    else{
+        std::cout<<"Error, could not open file..."<<std::endl;
+        return;
+    }
+    outFile.close();
+}
 
 void MySpecialMesh::exportAsMOFF(std::string filename) const{
 	std::string rootname = filename.substr(0,filename.length()-4);
 
 	std::string pngfilename = rootname + ".png";
-	std::string ppmfilename = rootname + ".ppm";
+    std::string pngfilenamePath = rootname + ".png";
+	// std::string ppmfilename = rootname + ".ppm";
 
     //extract filename of png file from path
     std::size_t lastSlash = pngfilename.rfind("/");
@@ -661,27 +1062,32 @@ void MySpecialMesh::exportAsMOFF(std::string filename) const{
         return;
     }
     outFile.close();
-    //saving png file as ppm
-	outFile.open(ppmfilename);
+
 	int img_width = int(sqrt(v_colors_.size()))+2;
     int img_height=img_width;
     while((img_width*(img_height-1))>=v_colors_.size())
     {
         img_height-=1;
     }
-	if(outFile.is_open())
-	{
-		outFile << "P3"<<std::endl;
-		outFile << img_width<<" "<<img_height<<" 255"<<std::endl;
-		outFile << "# Image Data"<<std::endl;
-		for(int32_t point_it = 0 ; (unsigned long int)point_it < v_colors_.size() ; ++point_it)
-			outFile << v_colors_[point_it](0) <<" "<< v_colors_[point_it](1) <<" "<< v_colors_[point_it](2) <<std::endl;
-	}
-	else{
-		log(ERROR)<<"Error, could not open file..."<<endLog();
-		return;
-	}
-	outFile.close();
+
+    //saving png file
+    cv::Mat pngMat(img_width,img_height,CV_32FC3,cv::Vec3f(0.0f,0.0f,0.0f));  //initialize color map
+    cv::Mat finalPngMat(img_width,img_height,CV_8UC3);
+    int curW=0;
+    int curH=0;
+    for(int32_t point_it = 0 ; (unsigned long int)point_it < v_colors_.size() ; ++point_it)
+    {
+        pngMat.at<cv::Vec3f>(curW,curH) = cv::Vec3f(v_colors_[point_it](2),v_colors_[point_it](1),v_colors_[point_it](0));
+        ++curH;
+        if(curH==img_height)
+        {
+            curH=0;
+            ++curW;
+        }
+    }
+    pngMat.convertTo(finalPngMat,CV_8UC3);
+    cv::imwrite(pngfilenamePath,finalPngMat);
+
 	log(ALWAYS)<<"[SpaceTimeSampler] : Writing done!"<<endLog();
 }
 
@@ -1119,7 +1525,130 @@ void MySpecialMesh::exportAsFullPLY(std::string filename) const{
     log(ALWAYS)<<"[SpaceTimeSampler] : Writing done!"<<endLog();
 }
 
+// void MySpecialMesh::exportColorGraph(std::string filename)const{
+
+
+// }
+
+
+std::vector<Vector3f> MySpecialMesh::getSamplesPosition(){
+
+    std::vector<Vector3f> out_pos(v_colors_.size());
+
+    #pragma omp parallel for schedule(dynamic)
+    for(int32_t tri = 0; tri<v_faces_.size(); ++tri) //For every kept triangle
+    {
+        Vector3f Vref, Vedge1, Vedge2;
+        const MyTriangle &triangle = v_faces_[tri]; 
+        Vref = v_points_[triangle.ref];
+        Vedge1 = v_points_[triangle.edge1];
+        Vedge2 = v_points_[triangle.edge2];
+        unsigned short triFaceRes = v_face_res_[tri];
+
+        float lambda1,lambda2,lambda3;
+        long centerIndex;
+        //for each sample
+        for(int b0 = 0; b0<=triFaceRes; ++b0)
+        {
+            lambda1=(float)b0/triFaceRes;
+            for(int b1=0; b1<=triFaceRes-b0;++b1)
+            {
+                lambda2=(float)b1/triFaceRes;
+                lambda3=1-lambda1-lambda2;
+                Vector3f center = lambda1*Vref+lambda2*Vedge1+lambda3*Vedge2;
+                //get color of center - put this into a function
+                centerIndex = this->getSampleColorIndex(triangle,tri,triFaceRes,b0,b1);
+                if(centerIndex>=0)
+                {
+                    out_pos[centerIndex]=center;
+                }
+            }
+        }
+    }
+
+    return out_pos;
+
+}
 
 
 
+// ------------------------------------
+// Can return -1 is there is no sample on these coordinates (for edge samples)
+// see getSampleColor for interpolation
+// ------------------------------------
+long MySpecialMesh::getSampleColorIndex( const MyTriangle &triangle,
+                                            const int tri_ind,
+                                            const int faceRes,
+                                            const int b0,
+                                            const int b1)const
+{
 
+    long myInd=-1;
+    long edge_ind;
+    int edge_res;
+    if(b0==faceRes)         //v ref
+    {
+        myInd = triangle.ref;
+    }
+    else if(b1==faceRes)    //v edge1
+    {
+        myInd = triangle.edge1;   
+    }
+    else if(b0==0 && b1==0) //v edge2
+    {
+        myInd = triangle.edge2;
+    }
+    else if(b0==0)          //2nd edge (v3,v2)
+    {
+        edge_ind = v_edge_color_ind_[tri_ind](1,0);
+        edge_res = v_colors_[std::abs(edge_ind)](0);
+        if((b1*edge_res)%faceRes==0)
+        {
+            if(edge_ind<0)
+            {
+                myInd = -edge_ind+edge_res-(b1*edge_res/faceRes);
+            }
+            else
+            {
+                myInd = edge_ind+b1*edge_res/faceRes;
+            }
+        }    
+    }
+    else if(b1==0)          //3rd edge (v1,v3)
+    {
+        edge_ind = v_edge_color_ind_[tri_ind](2,0);
+        edge_res = v_colors_[std::abs(edge_ind)](0);
+        if((b0*edge_res)%faceRes==0)
+        {
+            if(edge_ind<0)
+            {
+                myInd = -edge_ind+b0*edge_res/faceRes;
+            }
+            else
+            {
+                myInd = edge_ind+edge_res-b0*edge_res/faceRes;
+            }
+        }
+    }
+    else if(b0+b1==faceRes) //1st edge (v2, v1)
+    {
+        edge_ind = v_edge_color_ind_[tri_ind](0,0);
+        edge_res = v_colors_[std::abs(edge_ind)](0);
+        if((b1*edge_res)%faceRes==0)
+        {
+            if(edge_ind<0)
+            {
+                myInd = -edge_ind+b1*edge_res/faceRes;
+            }
+            else
+            {
+                myInd = edge_ind+b0*edge_res/faceRes;
+            }
+        }
+    }
+    else                    //face
+    {
+        myInd = v_face_color_ind_[tri_ind]+(b0-1)*faceRes - (b0*(b0+1))/2 +1 + (b1-1);
+    }
+    return myInd;
+}

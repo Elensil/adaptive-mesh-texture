@@ -8,11 +8,8 @@ OptionManager::OptionManager()
     mode_ = 'S';
     output_folder_ = "";
     images_sequences_ = "";
-    silhouettes_sequences_ = "";
     projection_matrices_ = "";
-
-    nb_interest_centroids_ = 50;
-    reconstruct_cameras_ = false;
+    input_mesh_ = "";
 
     config_file_ = "";
     first_frame_ = 0;
@@ -46,7 +43,18 @@ std::string OptionManager::get_output_path(const std::string& filename) const{
     return filename.substr(0,found);
 }
 
+std::string OptionManager::get_output_folder() const{
+    size_t found = output_folder_.find_last_of("/");
 
+    if(found==output_folder_.length()-1)
+    {
+        return output_folder_;
+    }
+    else
+    {
+        return output_folder_+"/";
+    }
+}
 
 /**
  * @brief OptionManager::getCamIds
@@ -137,13 +145,11 @@ int OptionManager::writeConfigurationFile(){
         seq_config << "Mode                                     = " << mode_ << std::endl;
         seq_config << "Output Folder                            = " << output_folder_ << std::endl;
         seq_config << "Images Sequence                          = " << images_sequences_ << std::endl;
-        seq_config << "Silhouettes Sequence                     = " << silhouettes_sequences_ << std::endl;
         seq_config << "Projection Matrices                      = " << projection_matrices_ << std::endl;
+        seq_config << "Input Mesh Sequence                      = " << input_mesh_ <<std::endl;
         seq_config << "firstFrame                               = " << first_frame_ << std::endl;
         seq_config << "lastFrame                                = " << last_frame_ << std::endl;
         seq_config << "backwardProcessing                       = " << backward_processing_ << std::endl;
-        seq_config << "Number of interest Points                = " << nb_interest_centroids_ << std::endl;
-        seq_config << "Enable Camera Reconstruction             = " << reconstruct_cameras_ << std::endl;
         seq_config.close();
     }
 
@@ -176,15 +182,13 @@ po::options_description OptionManager::config_options_description(){
     po::options_description config("Configuration");
     config.add_options()
             ("configuration_file", po::value<std::string>(&config_file_),"Configuration file")
-            ("mode,m", po::value<char>(&mode_), "(required) Running mode (S (static), D (dynamic) or C (cleaning).")
+            ("mode,m", po::value<char>(&mode_), "(required) Running mode (C (color), Z (compress), CZ (color + compress) or X (extract).")
             ("output_mesh_seq,o", po::value<std::string>(&output_folder_), "(required) Full path of the output mesh sequence.")
             ("images_sequences,i", po::value<std::string>(&images_sequences_),"(required) Path to images sequences")
-            ("silhouettes_sequences,s", po::value<std::string>(&silhouettes_sequences_)," Path to silhouettes sequences")
             ("projection_matrices,p", po::value<std::string>(&projection_matrices_)," Path to projection matrices ")
+            ("input_mesh_,g", po::value<std::string>(&input_mesh_), "Colored or textured OFF file")
             ("first_frame,f",po::value<int>(&first_frame_)->default_value(0),"First frame of the mesh sequence.")
-            ("last_frame,l",po::value<int>(&last_frame_)->default_value(100),"Last frame of the mesh sequence.")
-            ("number_centroids,k",po::value<unsigned int>(&nb_interest_centroids_)->default_value(50),"Number of interest points to be detected.")
-            ("enable_cam_reconstruction,c",po::value<bool>(&reconstruct_cameras_)->default_value(false),"Enable Camera Reconstruction if visible.");
+            ("last_frame,l",po::value<int>(&last_frame_)->default_value(100),"Last frame of the mesh sequence.");
     return config;
 
 }
@@ -240,14 +244,12 @@ void OptionManager::displayOptions(){
     log(ALWAYS) << "--------- " << endLog();
     log(ALWAYS) << " ................. running mode                  = " << mode_ << endLog();
     log(ALWAYS) << " ................. images sequences              = " << images_sequences_ << endLog();
-    log(ALWAYS) << " ................. silhouettes sequences         = " << silhouettes_sequences_ << endLog();
     log(ALWAYS) << " ................. projection matrices           = " << projection_matrices_ << endLog();
     log(ALWAYS) << " ................. output folder                 = " << output_folder_ << endLog();
+    log(ALWAYS) << " ................. input meshes sequence         = " << input_mesh_ << endLog();
     log(ALWAYS) << " ................. first frame                   = " << first_frame_ << endLog();
     log(ALWAYS) << " ................. last frame                    = " << last_frame_ << endLog();
     log(ALWAYS) << " ................. backward processing           = " << backward_processing_ << endLog();
-    log(ALWAYS) << " ................. number of centroids           = " << nb_interest_centroids_ << endLog();
-    log(ALWAYS) << " ................. enable camera reconstruction  = " << reconstruct_cameras_ << endLog();
     log(ALWAYS) << std::endl;
 }
 
@@ -317,12 +319,14 @@ int OptionManager::parseOptions(int argc, char **argv){
         throw std::runtime_error("[Fatal Error] : missing argument.");
     }
 
-    if (!vm.count("images_sequences")){
-        log(ERROR) << "[Option Manager] : missing images sequence argument." << endLog();
-        log(ERROR) << cmdline_options << endLog();
-        throw std::runtime_error("[Fatal Error] : missing argument.");
+    if (mode_=='C')     //Hard-coded, not ideal, but will do.
+    {
+        if (!vm.count("images_sequences")){
+            log(ERROR) << "[Option Manager] : missing images sequence argument." << endLog();
+            log(ERROR) << cmdline_options << endLog();
+            throw std::runtime_error("[Fatal Error] : missing argument.");
+        }
     }
-
     /*This option allows to create a file that will contain the current configuration and extra information.
     This file can be used as a configuration file to run the program again.
     */

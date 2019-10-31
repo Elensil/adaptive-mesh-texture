@@ -67,7 +67,7 @@ public:
     */
     boost::optional< std::vector< size_t > > getCamIds() const;
 
-    std::string get_output_folder() const{return output_folder_;}
+    std::string get_output_folder() const;
 
 private:
     //! A method that returns the generic options description.
@@ -115,13 +115,6 @@ public:
     */
     std::string images_sequences_;
 
-    //! The base name of the silhouettes sequence    We assume the first %0ni to be the camera ID and the second to be the frame number.
-    /*! The base name of the silhouettes sequence
-        We will build the filename of each input frame using this string.
-        example :  /rootpath/camera%03i/path/to/input/silhouettes/silhouettes_sequences_%05i.jpg where
-    */
-    std::string silhouettes_sequences_;
-
     //! The base name for Projection Matrices.
     /*! The base name for Projection Matrices.
         We will build the projection matrix filename of each camera using this string.
@@ -134,6 +127,14 @@ public:
       This string is optional considering the configuration file is optional.
     */
     std::string config_file_;
+
+    //! The base name of the input OFF or OBJ mesh file.
+    /*! The name of the input OFF or OBJ mesh file.
+        Used in all three modes, to load a precolored mesh.
+        We will build the mesh filename of each frame using this string.
+        example: /path/to/input/folder/input_mesh_%05d.off where %05d is the frame number.
+    */
+    std::string input_mesh_;
 
     //! The first frame of the input sequence.
     int first_frame_;
@@ -148,12 +149,6 @@ public:
     bool create_config_file_;
     bool use_colors_;
     int log_level_;
-
-    //! number of interest point to find speedup -> (depends on number of non connected objects in the scene)
-    unsigned int nb_interest_centroids_;
-
-    //! Determine wether the cameras should be reconstructed if visible
-    bool reconstruct_cameras_;
 
 
 private:

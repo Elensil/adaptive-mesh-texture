@@ -8,55 +8,37 @@
 SpaceTimeSampler::SpaceTimeSampler(const OptionManager& om){
 
     frame_manager_ = FrameManager(om.first_frame_,om.last_frame_,om.backward_processing_,om.first_frame_);
-    std::vector<size_t> v_cameras_ids;
-    //Get camera indices
-    if(boost::optional< std::vector<size_t> > o_vector = om.getCamIds())
-         v_cameras_ids = *o_vector;
-    else
-        log(ERROR) << "[SpaceTimeSampler] : no camera detected in folder" << endLog();
-    if(v_cameras_ids.empty())
-        return;
-    log(ALWAYS)<<"[SpaceTimeSampler] : "<< v_cameras_ids.size() <<" cameras found. "<< endLog();
-
-    //Camera Init
-    v_cameras_.clear();
-    std::vector<std::pair<unsigned int,Vector3f>> cam_positions;
-    for(std::vector<size_t>::iterator it_camera = v_cameras_ids.begin() ; it_camera != v_cameras_ids.end() ; ++it_camera)
-    {
-        Camera temp_cam(*it_camera,om.images_sequences_);
-        if(!om.silhouettes_sequences_.empty())  temp_cam.setSilhouettesSequence(om.silhouettes_sequences_);
-        if(!om.projection_matrices_.empty()){
-            temp_cam.setProjectionMatrix(om.projection_matrices_);
-            temp_cam.setPositionFromProjectionMatrix();
-            temp_cam.setInverseProjectionMatrixFromProjectionMatrix();
-            cam_positions.push_back(std::make_pair(*it_camera,temp_cam.getPosition()));
-        }
-        temp_cam.setIndex(v_cameras_.size());
-        v_cameras_.push_back(temp_cam);
-        log(DEBUG)<<"[SpaceTimeSampler] Added camera "<<*it_camera<< " (index "<<v_cameras_.size() - 1<<")"<<endLog();
-    }
-
-    if(false)   //Export camera positions
+    if (om.mode_=='C')
     {
         
-        std::string filename = output_folder_ + "/camera_positions.obj";
-        std::ofstream outFile;
-        outFile.open(filename);
-        if(outFile.is_open())
-        {
-            outFile << "o camera_positions"<<std::endl;
-            for(unsigned int i = 0; i < cam_positions.size(); ++i)
-            {
-                outFile<<"v "<< cam_positions[i].second.transpose()<<std::endl;
-            }
-            outFile.close();
-        }
+        std::vector<size_t> v_cameras_ids;
+        //Get camera indices
+        if(boost::optional< std::vector<size_t> > o_vector = om.getCamIds())
+             v_cameras_ids = *o_vector;
         else
-            log(ERROR)<<"Could not export camera positions..."<<endLog();
+            log(ERROR) << "[SpaceTimeSampler] : no camera detected in folder" << endLog();
+        if(v_cameras_ids.empty())
+            return;
+        log(ALWAYS)<<"[SpaceTimeSampler] : "<< v_cameras_ids.size() <<" cameras found. "<< endLog();
+
+        //Camera Init
+        v_cameras_.clear();
+        std::vector<std::pair<unsigned int,Vector3f>> cam_positions;
+        for(std::vector<size_t>::iterator it_camera = v_cameras_ids.begin() ; it_camera != v_cameras_ids.end() ; ++it_camera)
+        {
+            Camera temp_cam(*it_camera,om.images_sequences_);
+            if(!om.projection_matrices_.empty()){
+                temp_cam.setProjectionMatrix(om.projection_matrices_);
+                temp_cam.setPositionFromProjectionMatrix();
+                temp_cam.setInverseProjectionMatrixFromProjectionMatrix();
+                cam_positions.push_back(std::make_pair(*it_camera,temp_cam.getPosition()));
+            }
+            temp_cam.setIndex(v_cameras_.size());
+            v_cameras_.push_back(temp_cam);
+            log(DEBUG)<<"[SpaceTimeSampler] Added camera "<<*it_camera<< " (index "<<v_cameras_.size() - 1<<")"<<endLog();
+        }
     }
-
     output_folder_ = om.get_output_folder();
-
 }
 
 
@@ -281,6 +263,137 @@ float SpaceTimeSampler::normalizedCorrelation(const std::vector<Vector3f> &x, co
     return ncR+ncG+ncB;
 
 }
+
+void SpaceTimeSampler::addAdjacencyEdge(const int32_t i1, const int32_t i2, cv::Mat &adjMat, std::vector<int> &adjMatInd)const{
+    int indI1 = adjMatInd[i1];
+
+    if(i1>=adjMat.rows)
+    {
+        log(ERROR)<<"WTF?"<<endLog();
+    }
+
+    if(indI1>=adjMat.cols)
+    {
+        log(WARN)<<"SATURATED NODE!!"<<endLog();
+    }
+    else
+    {
+        adjMat.at<int32_t>(i1,indI1) = i2;
+        adjMatInd[i1]+=1;
+    }
+
+    int indI2 = adjMatInd[i2];
+    if(indI2>=adjMat.cols)
+    {
+        log(WARN)<<"SATURATED NODE!!"<<endLog();
+    }
+    else
+    {
+        adjMat.at<int32_t>(i2,indI2) = i1;
+        adjMatInd[i2]+=1;
+    }
+}
+
+void SpaceTimeSampler::removeAdjacencyVertex(const int32_t i1, cv::Mat &adjMat)const{
+    int K = adjMat.cols;
+    for(int i = 0;i<K;++i)
+    {
+        adjMat.at<int32_t>(i1,i) = -1;
+    }
+    
+}
+
+//Single-Side!!
+//Remove i2 from i1's neighbours
+void SpaceTimeSampler::removeAdjacencyEdge(const int32_t i1, const int32_t i2, cv::Mat &adjMat, std::vector<int> &adjMatInd)const{
+    
+    int indI1 = adjMatInd[i1];
+    int badInd=-1;
+    for(int i=0;i<indI1;++i)
+    {
+        if(adjMat.at<int32_t>(i1,i)==i2)
+        {
+            badInd=i;
+            break;
+        }
+    }
+    if(badInd>=0)
+    {
+        for(int i=badInd;i<(indI1-1);++i)
+        {
+            adjMat.at<int32_t>(i1,i)=adjMat.at<int32_t>(i1,i+1);
+        }
+    }
+    adjMatInd[i1]-=1;
+}
+
+void SpaceTimeSampler::writeIntMatToFile(cv::Mat& m, const char* filename)const{
+    std::ofstream fout(filename);
+
+    if(!fout)
+    {
+        std::cout<<"File Not Opened"<<std::endl;  return;
+    }
+
+    for(int i=0; i<m.rows; i++)
+    {
+        for(int j=0; j<m.cols; j++)
+        {
+            fout<<m.at<int32_t>(i,j)<<"\t";
+        }
+        fout<<std::endl;
+    }
+
+    fout.close();
+}
+
+void SpaceTimeSampler::exportOFF(std::vector<Vector3f> points, std::string filename) const{
+    
+    std::ofstream outFile;
+    outFile.open(filename);
+
+    if(outFile.is_open())
+    {
+        outFile << "OFF"<<std::endl;
+        outFile << points.size()<<" 0 0"<<std::endl;
+        for(int32_t point_it = 0 ; (unsigned long int)point_it <points.size() ; ++point_it)
+            outFile<< points[point_it](0)
+                      <<" "<< points[point_it](1)
+                        <<" "<< points[point_it](2)
+                          <<std::fixed <<std::endl;
+    }
+    else{
+        std::cout<<"Error, could not open file..."<<std::endl;
+        return;
+    }
+    outFile.close();
+}
+
+void SpaceTimeSampler::exportCOFF(std::vector<Vector3f> points, std::vector<Vector3ui> colors, std::string filename) const{
+    
+    std::ofstream outFile;
+    outFile.open(filename);
+
+    if(outFile.is_open())
+    {
+        outFile << "COFF"<<std::endl;
+        outFile << points.size()<<" 0 0"<<std::endl;
+        for(int32_t point_it = 0 ; (unsigned long int)point_it <points.size() ; ++point_it)
+            outFile<< points[point_it](0)
+                      <<" "<< points[point_it](1)
+                        <<" "<< points[point_it](2)
+                          <<" "<< (float)(colors[point_it](0))/255.0
+                            <<" "<< (float)(colors[point_it](1))/255.0
+                              <<" "<< (float)(colors[point_it](2))/255.0
+                                <<" 1.0"<< std::fixed <<std::endl;
+    }
+    else{
+        std::cout<<"Error, could not open file..."<<std::endl;
+        return;
+    }
+    outFile.close();
+}
+
 
 
 // template void SpaceTimeSampler::reorderTrianglesVertices(std::vector<MyTriangle> &in_faces ,std::vector<Vector3f> &in_points)const;

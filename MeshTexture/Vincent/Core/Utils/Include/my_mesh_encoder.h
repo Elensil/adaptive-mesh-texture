@@ -45,9 +45,9 @@ public:
 	MeshEncoder(){
 	};
 
-	void writeJPEGMeshColor(std::map<int,cv::Mat> &dctTrianglesList, std::map<int,std::vector<float>> &quantizationTables, std::map<int,cv::Mat> &eigenVectors, std::string filePath, std::string fileName);
+	void writeJPEGMeshColor(std::map<int,cv::Mat> &dctTrianglesList, std::map<int,std::vector<float>> &quantizationTables, std::map<int,cv::Mat> &eigenVectors, std::map<int,int> &quantMultipliers, std::string filePath, std::string fileName);
 
-    void writeJPEGMeshColor(std::map<int,std::vector<cv::Mat>> &dctTrianglesList, std::string outPath)const;
+    // void writeJPEGMeshColor(std::map<int,std::vector<cv::Mat>> &dctTrianglesList, std::string outPath)const;
 
     std::vector<BitArray> getMeshBinaryColor(std::map<int,std::vector<cv::Mat>> &dctTrianglesList,int trianglesNumber)const;
 
@@ -75,7 +75,7 @@ public:
 
     inline std::vector<Vector3f> getPoints()const{return points;}
 
-    std::map<int,cv::Mat> decodeCompressedData(std::map<int,cv::Mat> &resPCAEigenVectors, std::string filePath, std::string fileName);
+    std::map<int,cv::Mat> decodeCompressedData(std::map<int,cv::Mat> &resPCAEigenVectors, std::string filePath);
 
     unsigned char readCodedByte(BitArray &bitStream, HuffTree &dcTree);
 
