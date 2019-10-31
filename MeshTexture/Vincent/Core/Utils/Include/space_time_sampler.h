@@ -558,8 +558,7 @@ void SpaceTimeSampler::colorPointCloud( MySpecialMesh *in_mesh,
     
     //now, measure consensus of each camera WRT the others, for each vertex
     
-    int iterNumber = OUT_OF_CAMERA_NUMBER-CAMERA_NUMBER;
-    log(ALWAYS)<<"Iter number = "<<iterNumber<<endLog();                           
+    int iterNumber = OUT_OF_CAMERA_NUMBER-CAMERA_NUMBER;                          
     //We compute color value per triangle, and use this to discard or select appropriate cameras. Then, we end up with a list of cameras per triangle, just as before, and we can project them back on vertices.
     //Start with OUT_OF_CAMERA_NUMBER per triangle (selected based on number of votes), and remove least consensual ones until there are CAMERA_NUMBER cameras left per triangle.
     //Now, when projected back on vertices, we might end up with cameras from nearby triangles voting on a triangle even though they were discarded.
@@ -582,10 +581,8 @@ void SpaceTimeSampler::colorPointCloud( MySpecialMesh *in_mesh,
         while(currentIter<iterNumber)
         {
             int discardedCamInd = 0;
-            //log(ALWAYS)<<"currentCameraNumber: "<<currentCameraNumber<<endLog();
             for(int tri=0; tri<points.size();++tri)   //loop over triangles
             {
-                //log(ALWAYS)<<"triangle: "<<tri<<endLog();
                 int currentCameraNumber = triangles_cam[tri].size();
                 std::vector<float> tri_cam_discrepancy (currentCameraNumber, 0.0f);
                 for(int camI1=0;camI1<currentCameraNumber-1;++camI1)     //loop over pairs of (non-equal) camera indices.

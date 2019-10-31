@@ -58,11 +58,11 @@ int main(int argc, char **argv)
             dst = DOWNSAMPLE_THRESHOLD;
             std::string colored_output_name = (boost::format(output_name_format+"moff") % hyper_volume->getFrameNumber(frame)).str();
 
-            if (boost::filesystem::exists(colored_output_name))
-            {
-                log(WARN)<<"Skipping file "<<colored_output_name<<": already exists."endLog();
-                continue;
-            }
+            // if (boost::filesystem::exists(colored_output_name))
+            // {
+            //     log(WARN)<<"Skipping file "<<colored_output_name<<": already exists."<<endLog();
+            //     continue;
+            // }
 
             log(ALWAYS)<<"Generating file "<<colored_output_name<<endLog();
             mesh_to_be_cleaned.cleanAndColor(hyper_volume, fr, dst);
@@ -89,7 +89,7 @@ int main(int argc, char **argv)
             float quantMatCoefs[] = {1,QUANT_MAT_L1,QUANT_MAT_L2};
             MySpecialMesh mesh_to_be_cleaned(hyper_volume->getFrameNumber(frame),input_name);
             log(ALWAYS)<<"mesh loaded."<<endLog();
-            std::string compressed_output_name = (boost::format(output_name_format+"_extracted.moff") % hyper_volume->getFrameNumber(frame));
+            std::string compressed_output_name = (boost::format(output_name_format+"_extracted.moff") % hyper_volume->getFrameNumber(frame)).str();
             mesh_to_be_cleaned.uncompressColoredMesh(hyper_volume,quantFactor,quantMatCoefs);
             mesh_to_be_cleaned.exportAsMOFF(compressed_output_name);
         }
