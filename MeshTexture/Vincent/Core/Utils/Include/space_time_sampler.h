@@ -277,13 +277,6 @@ void SpaceTimeSampler::colorPointCloud( MySpecialMesh *in_mesh,
 
     int downsamplingThreshold = in_downsamplingThreshold;             //Max error (color euclidian distance) tolerated /pixel when downsampling faces or edges.
                                                     //Set to -1 to deactivate downsampling entirely 
-
-    std::ofstream fout(outputPath + "samplingLogFilevul", std::ios::app);
-    fout<<"--------------------------------------------------"<<std::endl;
-    fout<<"downsamplingThreshold = "<<downsamplingThreshold<<std::endl;
-    fout<<"default_face_res = "<<default_face_res<<std::endl;
-    
-    fout<<"faceResParam = "<<faceResParam<<std::endl;
     
     boost::posix_time::ptime time_begin;     //to measure computation time of different algorithmic blocks.
     boost::posix_time::time_duration time_diff;
@@ -851,10 +844,6 @@ void SpaceTimeSampler::colorPointCloud( MySpecialMesh *in_mesh,
     //             log(ALWAYS)<<"In tex coords size: "<<in_tex_coords.size()<<endLog();
     //             log(ALWAYS)<<"In tex indices size: "<<in_tex_indices.size()<<endLog();
     //             int texRes=tr;
-    //             std::ofstream foutTxt(outputPath + "samplingLogFileTxt", std::ios::app);
-    //             foutTxt<<"--------------------------------------------------"<<std::endl;
-    //             foutTxt<<"texRes = "<<texRes<<std::endl;
-    //             foutTxt.close();
     //             cv::Mat texMat = generateTextureMap(texRes, texRes, triangles, in_tex_coords, in_tex_indices, points, vertices_cam, camera_K, cam_tri_ind, outputPath);
     //             cv::imwrite(outputPath + "texture_" + std::to_string(texRes) + ".png", texMat);
     //             log(ALWAYS)<<"texture written ("<<texRes<<")"<<endLog();
@@ -1229,7 +1218,6 @@ void SpaceTimeSampler::colorPointCloud( MySpecialMesh *in_mesh,
             out_edge_color_ind.push_back(edge_ind);
         }
     }
-    fout<<"Dead pixels remaining: "<<uselessPixels<<std::endl;
 
     log(ALWAYS)<<"Dead pixels remaining: "<<uselessPixels<<endLog();
     log(ALWAYS)<<"Filling adjacency matrix"<<endLog();
@@ -1407,9 +1395,6 @@ void SpaceTimeSampler::colorPointCloud( MySpecialMesh *in_mesh,
     //sharpenColor(3.0,out_colors,samples_adj);
 
     // Downsampling part
-    //*
-    fout<<"color samples: "<<out_colors.size()<<std::endl;
-    fout.close();
 
     //Update input mesh
     in_mesh->setFacesVector(in_faces);
@@ -1431,7 +1416,7 @@ void SpaceTimeSampler::colorPointCloud( MySpecialMesh *in_mesh,
     //The following lines is a necessary if reIndexColors is not run (I think?)
     // out_edge_color_ind=temp_edge_color_ind;
     // in_mesh->setEdgesIndVector(out_edge_color_ind);
-    
+
     // out_colors[0](0)=1;
     //consistencyTest(out_colors,out_face_res,out_edge_color_ind,out_face_color_ind);
 
@@ -2737,7 +2722,6 @@ cv::Mat SpaceTimeSampler::generateTextureMap(const unsigned int width, const uns
     cv::Mat texMap(width,height,CV_32FC3, cv::Vec3f(0.0f,0.0f,0.0f));  //initialize texture map
     cv::Mat texWeight(width,height,CV_32FC1,0.0f);
     cv::Mat finalTexMap(width,height,CV_8UC3);
-    std::ofstream fout(outputPath+"samplingLogFileTxt", std::ios::app);
     
     for(unsigned long tri=0;tri<in_faces.size();++tri)
     {
@@ -2842,7 +2826,6 @@ cv::Mat SpaceTimeSampler::generateTextureMap(const unsigned int width, const uns
 
     //Bleed color (dilate texture)
     cv::Mat silMask = (texWeight>0);
-    fout<<"before bleeding: "<<cv::sum(silMask)[0]/255<<" texels"<<std::endl;
 
     int treatedTexels;
 
@@ -2901,11 +2884,6 @@ cv::Mat SpaceTimeSampler::generateTextureMap(const unsigned int width, const uns
     }
 
     silMask = (texWeight>0);
-
-    fout<<"texture complete, "<<cv::sum(silMask)[0]/255<<" texels"<<std::endl;
-    fout<<" --------------------------------- "<<std::endl;
-    fout<<std::endl;
-    fout.close();
 
     merge(channel,3,texMap);
     texMap.convertTo(finalTexMap,CV_8UC3);
@@ -3532,7 +3510,6 @@ void SpaceTimeSampler::reIndexColors(   MySpecialMesh *in_mesh,
     in_mesh->getFacesIndVector(in_face_color_ind);
     in_mesh->getEdgesRealColorInd(in_edge_indices);
     std::string outputPath = output_folder_;
-    std::ofstream fout(outputPath+"samplingLogFilevul", std::ios::app);
 
     int edgeResPixelsNumber=0;
 
@@ -3697,10 +3674,6 @@ void SpaceTimeSampler::reIndexColors(   MySpecialMesh *in_mesh,
             }
         }
         curResFaces.erase(curResFaces.begin()+curInd,curResFaces.end());
-        if(curInd>0)
-        {
-            fout<<"res "<<myRes<<", "<<curInd<<" faces"<<std::endl;
-        }
         //Now, we have the correct vector of index
         //Loop through it
         for(int tri=0;tri<curResFaces.size();++tri)
@@ -3789,13 +3762,6 @@ void SpaceTimeSampler::reIndexColors(   MySpecialMesh *in_mesh,
         }
     }
     log(ALWAYS)<<"useless (edge) pixels saved: "<<edge_res_pixels_saved<<endLog();
-    fout<<"final color samples count: "<<in_colors.size()<<std::endl;
-    fout<<"(minus edge res pixels: "<<edgeResPixelsNumber<<")"<<std::endl;
-    fout<<"empty edge pixels saved: "<<edge_res_pixels_saved<<std::endl;
-    fout<<" --------------------------------- "<<std::endl;
-    fout<<std::endl;
-    fout.close();
-
 
     log(ALWAYS)<<"reindex edges"<<endLog();
     for(int tri=0;tri<triangles.size();++tri)
@@ -3874,40 +3840,6 @@ void SpaceTimeSampler::compressColor(   MySpecialMesh *in_mesh,
     in_mesh->getFacesIndVector(in_face_color_ind);
 
     std::string outputPath = output_folder_;
-    std::ofstream fout(outputPath+"samplingLogFilevul", std::ios::app);
-    // //computing temp edge vector
-    // std::vector<Vector3li> temp_edge_color_ind(in_edge_color_ind.size());
-    // log(ALWAYS)<<"in_faces size = "<<in_faces.size()<<endLog();
-    // log(ALWAYS)<<"in_edge_color_ind size = "<<in_edge_color_ind.size()<<endLog();
-    // log(ALWAYS)<<"temp_edge_color_ind size = "<<temp_edge_color_ind.size()<<endLog();
-    // log(ALWAYS)<<"in_edge_indices size = "<<in_edge_indices.size()<<endLog();
-    // // log(ALWAYS)<<"max in_edge_color_ind = "<<std::max(in_edge_color_ind)<<endLog();
-    // for(int tri=0;tri<in_faces.size();++tri)
-    // {
-    //     for(int e=0;e<3;++e)
-    //     {
-    //         if (in_edge_color_ind[tri](e)>=0)
-    //         {
-    //             if(in_edge_color_ind[tri](e)>=in_faces.size())
-    //             {
-    //                 log(ALWAYS)<<"ERROR: tri "<<tri<<", e "<<e<<", edge_color_ind = "<<in_edge_color_ind[tri](e)<<endLog();
-    //             }
-    //             temp_edge_color_ind[tri](e) = in_edge_indices[in_edge_color_ind[tri](e)];
-    //         }
-    //         else
-    //         {
-    //             if(-in_edge_color_ind[tri](e)>=in_faces.size())
-    //             {
-    //                 log(ALWAYS)<<"ERROR: tri "<<tri<<", e "<<e<<", edge_color_ind = "<<in_edge_color_ind[tri](e)<<endLog();
-    //             }
-    //             temp_edge_color_ind[tri](e) = - in_edge_indices[- in_edge_color_ind[tri](e)];
-    //         }
-    //     }
-    // }
-    // // log(ALWAYS)<<"test 0"<<endLog();
-    // // downsampleMeshColor(in_faces, in_colors, in_face_res, temp_edge_color_ind, in_face_color_ind, downsamplingThreshold);
-    // // log(ALWAYS)<<"test 1"<<endLog();
-    // // in_edge_color_ind = temp_edge_color_ind;
 
     std::vector<Vector3li> temp_edge_color_ind = in_edge_color_ind;
     
