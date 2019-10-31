@@ -54,7 +54,22 @@ Detailed instructions:
 
 
 #### Possible modes:
-- 'C': Coloring: Takes a .obj mesh, some input views, along with calibration matrices, and generates a textured mesh.
+- 'C': Coloring: Takes a .obj mesh, some input views, along with calibration matrices, and generates a textured mesh (moff + png).
 Parameters:
-- 'Z': Compression:
-- 'X': Extraction:
+- 'Z': Compression: Takes a textured mesh (moff) and compresses the appearance. Returns (zoff + dat)
+- 'X': Extraction: Takes a compressed textured mesh (zoff) and returns a readable textured mesh (moff + png)
+
+#### Parameters:
+
+	-o /path/to/folder						# Output folder
+	-g /path/to/input/mesh_num%03i.obj 		# Input mesh format
+	-m C 									# Mode: 'C' for coloring, 'Z' for compression, 'X' for extraction
+	-f 0 									# number of first frame
+	-l 100 									# number of last frame: the whole range will be used, along with the input format, to search for input files.
+
+Specific parameters for coloring mode:
+
+	-p /path/to/calibration/matrix_num%03i.txt 					# Path to calibration matrix. The format will be completed with cam number (1 to max matching file). The file must contain a single line with the full camera matrix unfolded into a row.
+	-i /path/to/input/images/cam_num%03i/frame_num%03i.png 		# Path to input images. The format will be completed with cam number and frame number
+
+
