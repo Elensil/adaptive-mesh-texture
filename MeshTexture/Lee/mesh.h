@@ -140,8 +140,6 @@ public:
 template<class PhotoUtils>
 void MySpecialMesh::cleanAndColor(const PhotoUtils *hyper_volume, int in_faceResParam, int in_downsamplingThreshold){
     hyper_volume->colorPointCloud(this, in_faceResParam, in_downsamplingThreshold);
-    // hyper_volume->colorInput(this, in_faceResParam, in_downsamplingThreshold);
-    log(ALWAYS)<<"alright!"<<endLog();
 }
 
 template<class PhotoUtils>
@@ -160,11 +158,9 @@ template<class PhotoUtils>
 void MySpecialMesh::uncompressColoredMesh(const PhotoUtils *hyper_volume, int quantFactor, float quantMatCoefs[]){
 
     log(ALWAYS)<<"Starting extraction."<<endLog();
-
-    // hyper_volume->reIndexColors(this, 32, quantMatCoefs, -1);
     hyper_volume->decodeCompressedColor(this, 32, quantFactor);
     log(ALWAYS)<<"Extraction complete."<<endLog();
-    // hyper_volume->reIndexColors(this, 32, quantMatCoefs, 0);
+
 }
 
 

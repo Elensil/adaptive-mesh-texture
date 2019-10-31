@@ -319,10 +319,8 @@ void SpaceTimeSampler::colorPointCloud( MySpecialMesh *in_mesh,
     //      1. Project pixels (votes) on triangles)
     // ---------------------------------------------------------------------------
     
-    // log(WARN)<<"[SpaceTimeSampler] : WARNING!! Hard-coded cam number!"<<endLog();
     #pragma omp parallel for schedule(dynamic)
     for(unsigned int cam = 0; cam < v_cameras_.size(); ++cam)
-    // for(unsigned int cam = 0; cam < 20; ++cam)
     {
         //TBD: make this image size a variable
         cv::Mat cam_image(IMG_HEIGHT*CLEANING_FACTOR,IMG_WIDTH*CLEANING_FACTOR,CV_32SC1,cv::Scalar(0));//Contains index of the nearest projected triangle +1! (0 is non affected)
@@ -1043,7 +1041,6 @@ void SpaceTimeSampler::colorPointCloud( MySpecialMesh *in_mesh,
             {
                 for(int b1=0;b1<=faceRes-b0;++b1)
                 {
-                    // log(ALWAYS)<<"wut"<<endLog();
                     current_color_index=-1;
                     vI = -1;    //dirty trick to save code... Useful for now
                     vI2 = -1;
@@ -2133,9 +2130,6 @@ void SpaceTimeSampler::filterColoredMeshLoG(const float sigma, const float lambd
                         current_red=std::min(std::max(0.0f,current_red),255.1f);
                         current_green=std::min(std::max(0.0f,current_green),255.1f);
                         current_blue=std::min(std::max(0.0f,current_blue),255.1f);
-                        //log(ALWAYS)<<"original color: ("<<centerColor(0)<<","<<centerColor(1)<<","<<centerColor(2)<<"), weight = "<<weight<<endLog();
-                        //log(ALWAYS)<<"new color: ("<<current_red<<","<<current_green<<","<<current_blue<<"), neighbours: "<<neighboursCount<<endLog();
-                        //current_color=OutColor(current_color(0)/weight,current_color(1)/weight,current_color(2)/weight);
                         filtered_out_colors[centerIndex]=InColor(int(current_red),int(current_green),int(current_blue));
                     }
                     //*/
@@ -2668,12 +2662,10 @@ void SpaceTimeSampler::colorTVNormVote(const std::vector<std::vector<InColor> > 
             df_r+= (float(temp_colors[samp](0))-float(out_colors[samp](0)))/255;
             df_g+= (float(temp_colors[samp](1))-float(out_colors[samp](1)))/255;
             df_b+= (float(temp_colors[samp](2))-float(out_colors[samp](2)))/255;
-            //log(ALWAYS)<<"samp: "<<temp_colors2[samp](0)<<endLog();
+
             temp_colors2[samp](0) = int(std::max(0.0f,std::min(float(255.0),float(temp_colors2[samp](0))-gamma * df_r)));
             temp_colors2[samp](1)= int(std::max(0.0f,std::min(float(255.0),float(temp_colors2[samp](1))-gamma * df_g)));
             temp_colors2[samp](2) = int(std::max(0.0f,std::min(float(255.0),float(temp_colors2[samp](2))-gamma * df_b)));
-            //log(ALWAYS)<<"df_r: "<<df_r<<endLog();
-            //log(ALWAYS)<<"updated samp: "<<temp_colors2[samp](0)<<endLog();
             
         }
 
@@ -3080,20 +3072,16 @@ void SpaceTimeSampler::setPixelsWhereTrianglesProjectCloser2(const std::vector<I
                     //get pixel value
                     if(px > 0 && px < (IMG_WIDTH*cleaning_factor) && py > 0 && py < IMG_HEIGHT*cleaning_factor)
                     {
-                        //log(ALWAYS)<<"jour"<<endLog();
                         int32_t &previous_triangle = out_image.at<int32_t>(py,px);
                         double &previous_depth = depth_map.at<double>(py,px);
                         //double &previous_depth = depth_map.at<double>(0,0);
                         //double previous_depth=0;
                         int32_t new_idx = triangle_idx;
-                        //log(ALWAYS)<<"nuit"<<endLog();
                         //*
                         if(previous_triangle > 0)
                         {
                             if(new_depth > previous_depth)
                             {
-                                //out_image.at<int32_t>(py,px) = new_idx+1;
-                                //depth_map.at<double>(py,px) = new_depth;
                                 new_idx = previous_triangle-1; //Don't change index if depth was not closer
                                 new_depth = previous_depth;
                             }
@@ -3323,7 +3311,6 @@ void SpaceTimeSampler::setPixelsWhereTrianglesProjectCloserWConfidence(const std
                         int32_t &previous_triangle = out_image.at<int32_t>(py,px);
                         double &previous_depth = depth_map.at<double>(py,px);
                         int32_t new_idx = triangle_idx;
-                        //log(ALWAYS)<<"nuit"<<endLog();
                         //*
                         if(previous_triangle > 0)
                         {
@@ -3644,7 +3631,6 @@ void SpaceTimeSampler::reIndexColors(   MySpecialMesh *in_mesh,
     {
         int faceRes = in_face_res[tri];
         int num_samples = (faceRes-1)*(faceRes-2)/2;
-        //log(ALWAYS)<<"tri: "<<tri<<" faceRes: "<<faceRes<<" num_samples: "<<num_samples<<endLog();
         for(int i=0;i<num_samples;++i)
         {
             triangles_avg_intensity[tri] += temp_colors[in_face_color_ind[tri]+i].sum();
@@ -3686,8 +3672,6 @@ void SpaceTimeSampler::reIndexColors(   MySpecialMesh *in_mesh,
             in_colors.insert(in_colors.end(), temp_colors.begin()+temp_face_color_ind[curResFaces[tri]], temp_colors.begin()+temp_face_color_ind[curResFaces[tri]]+samplesNumber);
         }
         time_diff = boost::posix_time::microsec_clock::local_time() - time_begin;
-        //log(ALWAYS)<<"redundancy check: Resolution = "<<myRes<<", "<<curInd<<" triangles"<<endLog();
-        //log(ALWAYS)<<"[SpaceTimeSampler] : "<<int(float(time_diff.total_milliseconds())/1000)<<" s"<<endLog();
     }
 
     log(ALWAYS)<<"Total saved pixels: "<<savedPixels<<" out of "<<temp_colors.size()<<endLog();
@@ -3738,7 +3722,6 @@ void SpaceTimeSampler::reIndexColors(   MySpecialMesh *in_mesh,
             }
         }
         curResEdges.erase(curResEdges.begin()+curInd,curResEdges.end());
-        //log(ALWAYS)<<"redundancy check: Resolution = "<<myRes<<", "<<curInd<<" edges"<<endLog();
 
         //loop through selected edges
         for(int e=0;e<curResEdges.size();++e)
@@ -3779,23 +3762,6 @@ void SpaceTimeSampler::reIndexColors(   MySpecialMesh *in_mesh,
 
 
     in_colors[0](0)=1;  //for edges with res 1
-
-    // log(ALWAYS)<<"Downsample Chroma"<<endLog();
-    // for(int tri=0;tri<in_faces.size();++tri)
-    // {
-    //     InTriangle myTri = in_faces[tri];
-    //     unsigned short myRes = in_face_res[tri];
-    //     long v1I = myTri.ref;
-    //     long v2I = myTri.edge1;
-    //     long v3I = myTri.edge2;
-    //     long e1I = in_edge_color_ind[tri](0);
-    //     long e2I = in_edge_color_ind[tri](1);
-    //     long e3I = in_edge_color_ind[tri](2);
-    //     downsampleEdgeChroma(e1I, v2I, v1I, in_colors);
-    //     downsampleEdgeChroma(e2I, v3I, v2I, in_colors);
-    //     downsampleEdgeChroma(e3I, v1I, v3I, in_colors);
-    //     downsampleTriangleChroma(tri,myTri,myRes,in_face_color_ind,in_edge_color_ind,in_colors);
-    // }
 
     //Update input mesh
     in_mesh->setFacesVector(in_faces);
@@ -4213,7 +4179,6 @@ void SpaceTimeSampler::decodeCompressedColor(   MySpecialMesh *in_mesh,
         int pc_number = compressed.cols;
         
         // --- reprojection ---
-        //log(ALWAYS)<<"Reprojection..."<<endLog();
         cv::Mat reconstructed;
         reconstructed.create(compressed.rows, colorSpaceSize, compressed.type());
 
@@ -4531,11 +4496,6 @@ void SpaceTimeSampler::decodeCompressedColor(   MySpecialMesh *in_mesh,
     for(int tri=0;tri<in_faces.size();++tri)
     {
         bool writeLog=false;
-        // if(tri==0)
-        // {
-        //     writeLog=true;
-        // }
-        // log(ALWAYS)<<"tri "<<tri<<endLog();
         InTriangle myTri = in_faces[tri];
         unsigned short myRes = out_face_res[tri];
         long v1I = myTri.ref;
@@ -4552,27 +4512,7 @@ void SpaceTimeSampler::decodeCompressedColor(   MySpecialMesh *in_mesh,
     }
     log(ALWAYS)<<"Downsampling ok"<<endLog();
 
-    // for(int tri=0;tri<2;++tri)
-    // {
-    //     for(int l1=0;l1<=32;++l1)    //loop through barycentric coordinates
-    //     {
-    //         for(int l2=0;l2<=32-l1;++l2)
-    //         {
-    //             if((tri<1)&&((l1==0)||(l2==0)||(l1+l2==32)))
-    //             {
-    //                 long color_ind = getSampleColorIndex(in_faces[tri], tri, 32, l1, l2, out_edge_color_ind, out_face_color_ind, out_colors);
-    //                 log(ALWAYS)<<"Tri "<<tri<<", samp ("<<l1<<","<<l2<<"): color value = ("<<out_colors[color_ind](0)<<","<<out_colors[color_ind](1)<<","<<out_colors[color_ind](2)<<")"<<endLog();
-    //                 log(ALWAYS)<<"current_color_index = "<<color_ind<<endLog();
-    //             }
-                
-    //         }
-    //     }
-
-    // }
-
     //Update input mesh
-    // in_mesh->setFacesVector(in_faces);
-    // in_mesh->setPointsVector(in_points);
     in_mesh->setColorsVector(out_colors);
     in_mesh->setFacesResVector(out_face_res);
     in_mesh->setEdgesIndVector(out_edge_color_ind);
@@ -5023,7 +4963,8 @@ bool SpaceTimeSampler::getSurfacePointColor(InTriangle &myTri, const std::vector
 
 }
 
-
+// SHOULD NOT BE USED!!
+// Corrected bug in getSurfacePointColor. Most likely also present in this function
 template<class InPoint, class InTriangle>
 bool SpaceTimeSampler::getSurfacePointColorWVis(InTriangle &myTri, int triangle_idx, const std::vector<InPoint> &in_points, Vector3f baryCoords, int cameraNumber, Vector3ui &out_color, std::vector<cv::Mat> &cam_tri_ind, bool writeLog)const
 {
@@ -5078,10 +5019,6 @@ bool SpaceTimeSampler::getSurfacePointColorWVis(InTriangle &myTri, int triangle_
     float g = 0.0f;
     float b = 0.0f;
     float w = 0.0f;
-
-    // log(ALWAYS)<<"camera num = "<<cameraNumber<<endLog();
-    // log(ALWAYS)<<"my point = ("<<intX*CLEANING_FACTOR<<","<<intY*CLEANING_FACTOR<<")"<<endLog();
-    // log(ALWAYS)<<"matrix dim = ("<<cam_image.rows<<","<<cam_image.cols<<")"<<endLog();
 
     triangle_idx+=1;    //Adding 1 because of offset in cam_image...
 
@@ -5316,6 +5253,8 @@ bool SpaceTimeSampler::getSurfacePointColorWVis(InTriangle &myTri, int triangle_
 // Takes point p of the surface, given by (myTri, baryCoords)
 // Gets its 2D coordinates in image of cameraNumber
 // Returns its color, using Nearest Neighbour interpolation
+// SHOULD NOT BE USED!!
+// Corrected bug in getSurfacePointColor. Most likely also present in this function
 template<class InPoint, class InTriangle>
 bool SpaceTimeSampler::getSurfacePointColorNN(InTriangle &myTri, const std::vector<InPoint> &in_points, Vector3f baryCoords, int cameraNumber, Vector3ui &out_color, bool writeLog)const
 {
@@ -5581,7 +5520,6 @@ void SpaceTimeSampler::downsampleEdge(  long edgeInd,
         }
         //If we reach this point, all samples passed the test, we can downsample the edge
         myRes/=2;
-        //log(ALWAYS)<<"downsampling edge "<<edgeInd<<" ("<<in_colors[edgeInd](0)<<","<<in_colors[edgeInd](1)<<","<<in_colors[edgeInd](2)<<")"<<endLog();
         in_colors[edgeInd](0) = myRes;
         for(int i=1;i<myRes;++i)
         {
@@ -5646,7 +5584,6 @@ void SpaceTimeSampler::downsampleEdgeMean(  long edgeInd,
         }
         //If we reach this point, all samples passed the test, we can downsample the edge
         myRes/=2;
-        //log(ALWAYS)<<"downsampling edge "<<edgeInd<<" ("<<in_colors[edgeInd](0)<<","<<in_colors[edgeInd](1)<<","<<in_colors[edgeInd](2)<<")"<<endLog();
         in_colors[edgeInd](0) = myRes;
         for(int i=1;i<myRes;++i)
         {
@@ -5673,7 +5610,6 @@ void SpaceTimeSampler::downsampleEdgeChroma(long edgeInd,
     }
     //get edge resolution
     int myRes = in_colors[edgeInd](0);
-    // log(ALWAYS)<<"Edge Chroma Downsampling: edgeRes = "<<myRes<<endLog();
     for(int i=1;i<myRes;++i)
     {
         if(writeLog)
