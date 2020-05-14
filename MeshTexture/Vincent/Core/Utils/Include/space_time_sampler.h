@@ -269,6 +269,7 @@ void SpaceTimeSampler::colorPointCloud( MySpecialMesh *in_mesh,
                                                             //TODO: replace this by saving spatial coordinates (or ray) of votes, and looping through votes of neighbours (for SR)
     
     bool bInputDownsampled = false;
+    bool b_computeAdj = false;
     int projection_margin_radius = PROJ_MARGIN_RADIUS;               
     double projection_margin_depth_threshold = PROJ_MARGIN_DEPTH_TH;
 
@@ -458,10 +459,10 @@ void SpaceTimeSampler::colorPointCloud( MySpecialMesh *in_mesh,
     std::vector< std::vector<float> > color_map_votes_weight(max_sample_size); //each vote is weighted by distance
 
 
-    std::vector<std::list<int32_t> > samples_adj(max_sample_size);
+    //std::vector<std::list<int32_t> > samples_adj(max_sample_size);
     log(ALWAYS)<<"Points Size = "<<points.size()<<endLog();
     log(ALWAYS)<<"triangles Size = "<<triangles.size()<<endLog();
-    log(ALWAYS)<<"samples_adj Size = "<<samples_adj.size()<<endLog();
+    //log(ALWAYS)<<"samples_adj Size = "<<samples_adj.size()<<endLog();
     //int dims[] = {points.size()+triangles.size()*(3*default_face_res/2+(default_face_res-1)*(default_face_res-2)/2),points.size()+triangles.size()*(3*default_face_res/2+(default_face_res-1)*(default_face_res-2)/2)};
     // int dims[] = {1,1};
     // cv::SparseMat adj_mat(2,dims,CV_8SC1);
@@ -820,33 +821,33 @@ void SpaceTimeSampler::colorPointCloud( MySpecialMesh *in_mesh,
     
 
 
-    // //generate texture map
-    // if((in_tex_coords.size()==0)||(in_tex_indices.size()==0))
-    // {
-    //     log(ALWAYS)<<"No texture atlas found. Skipping texture generation."<<endLog();
-    // }
-    // else
-    // {
-    //     int tr;
-    //     // std::vector<int> trValues = {512,1024, 1536, 2048,3072,4096,5120,6144,7168,8192};
-    //     std::vector<int> trValues = {512};
-    //     for(int trInd = 0;trInd<trValues.size();++trInd)
-    //     {
-    //         tr = trValues[trInd];
-    //         if (!boost::filesystem::exists(outputPath + "texture_" + std::to_string(tr) + ".png"))
-    //         {
-    //             log(ALWAYS)<<"Generating texture map..."<<endLog();
-    //             log(ALWAYS)<<"In tex coords size: "<<in_tex_coords.size()<<endLog();
-    //             log(ALWAYS)<<"In tex indices size: "<<in_tex_indices.size()<<endLog();
-    //             int texRes=tr;
-    //             cv::Mat texMat = generateTextureMap(texRes, texRes, triangles, in_tex_coords, in_tex_indices, points, vertices_cam, camera_K, cam_tri_ind, outputPath);
-    //             cv::imwrite(outputPath + "texture_" + std::to_string(texRes) + ".png", texMat);
-    //             log(ALWAYS)<<"texture written ("<<texRes<<")"<<endLog();
-    //         }
+    //generate texture map
+    if((in_tex_coords.size()==0)||(in_tex_indices.size()==0))
+    {
+        log(ALWAYS)<<"No texture atlas found. Skipping texture generation."<<endLog();
+    }
+    else
+    {
+        int tr;
+        // std::vector<int> trValues = {512,1024, 1536, 2048,3072,4096,5120,6144,7168,8192};
+        std::vector<int> trValues = {1024,2048,4096};
+        for(int trInd = 0;trInd<trValues.size();++trInd)
+        {
+            tr = trValues[trInd];
+            if (!boost::filesystem::exists(outputPath + "texture_" + std::to_string(tr) + ".png"))
+            {
+                log(ALWAYS)<<"Generating texture map..."<<endLog();
+                log(ALWAYS)<<"In tex coords size: "<<in_tex_coords.size()<<endLog();
+                log(ALWAYS)<<"In tex indices size: "<<in_tex_indices.size()<<endLog();
+                int texRes=tr;
+                cv::Mat texMat = generateTextureMap(texRes, texRes, triangles, in_tex_coords, in_tex_indices, points, vertices_cam, camera_K, cam_tri_ind, outputPath);
+                cv::imwrite(outputPath + "texture_" + std::to_string(texRes) + ".png", texMat);
+                log(ALWAYS)<<"texture written ("<<texRes<<")"<<endLog();
+            }
 
-    //     }
-    // }
-
+        }
+    }
+    return;
     time_begin  = boost::posix_time::microsec_clock::local_time();
     //Filter and weight votes based on this
     for(int32_t tri = 0; tri <triangles.size(); ++tri)
@@ -990,27 +991,30 @@ void SpaceTimeSampler::colorPointCloud( MySpecialMesh *in_mesh,
                         continue;
                     }
                     current_color_index = face_color_index + (b0-1)*faceRes - (b0+1)*b0/2 +1 + (b1-1);
-                    if(b1<faceRes-1-b0)    //not last sample on its 'line'
+                    if(b_computeAdj)
                     {
-                        i1 = current_color_index;
-                        i2 = current_color_index+1;
-                        addAdjacencyEdge(i1,i2,adjListMat,adjMatInd);
-                    }
-                    if(b0<faceRes-1)
-                    {
-                        if(b0+b1<faceRes-1)
+                        if(b1<faceRes-1-b0)    //not last sample on its 'line'
                         {
-
                             i1 = current_color_index;
-                            i2 = current_color_index+faceRes-(b0-1)-2;
+                            i2 = current_color_index+1;
                             addAdjacencyEdge(i1,i2,adjListMat,adjMatInd);
                         }
-                        if(b1>1)
+                        if(b0<faceRes-1)
                         {
+                            if(b0+b1<faceRes-1)
+                            {
 
-                            i1 = current_color_index;
-                            i2 = current_color_index+faceRes-(b0-1)-3;
-                            addAdjacencyEdge(i1,i2,adjListMat,adjMatInd);
+                                i1 = current_color_index;
+                                i2 = current_color_index+faceRes-(b0-1)-2;
+                                addAdjacencyEdge(i1,i2,adjListMat,adjMatInd);
+                            }
+                            if(b1>1)
+                            {
+
+                                i1 = current_color_index;
+                                i2 = current_color_index+faceRes-(b0-1)-3;
+                                addAdjacencyEdge(i1,i2,adjListMat,adjMatInd);
+                            }
                         }
                     }
                 }
@@ -1109,23 +1113,26 @@ void SpaceTimeSampler::colorPointCloud( MySpecialMesh *in_mesh,
                                     color_map_votes[current_color_index].push_back(OutColor(faceRes,255,255));      //record edgeRes
                                     color_map_votes_weight[current_color_index].push_back(1);
                                     //here, we put blue and green canal to the value of an edge vote, to minimize diskspace (useful?)
-                                     //fill adjacency matrix for edge samples:
-                                    // edge-edge
-                                    for(int adj=1;adj<faceRes-1;++adj)  //watch out for 'edge res' index
+                                    //fill adjacency matrix for edge samples:
+                                    if(b_computeAdj)
                                     {
-                                        i1 = current_color_index+adj;
-                                        i2 = current_color_index+adj+1;
+                                        // edge-edge
+                                        for(int adj=1;adj<faceRes-1;++adj)  //watch out for 'edge res' index
+                                        {
+                                            i1 = current_color_index+adj;
+                                            i2 = current_color_index+adj+1;
+                                            addAdjacencyEdge(i1,i2,adjListMat,adjMatInd);
+                                        }
+                                        //vertex-edge
+                                        i1 = point_indices[triverts[vI]];
+                                        i2 = current_color_index+1;
                                         addAdjacencyEdge(i1,i2,adjListMat,adjMatInd);
+                                        i1 = point_indices[triverts[vI2]];
+                                        i2 = current_color_index+faceRes-1;
+                                        addAdjacencyEdge(i1,i2,adjListMat,adjMatInd);
+                                        
+                                        //face-edge: dealt with later
                                     }
-                                    //vertex-edge
-                                    i1 = point_indices[triverts[vI]];
-                                    i2 = current_color_index+1;
-                                    addAdjacencyEdge(i1,i2,adjListMat,adjMatInd);
-                                    i1 = point_indices[triverts[vI2]];
-                                    i2 = current_color_index+faceRes-1;
-                                    addAdjacencyEdge(i1,i2,adjListMat,adjMatInd);
-                                    
-                                    //face-edge: dealt with later
                                 }
                             }
                             if(color_map_votes[current_color_index][0](0)>faceRes){        //this triangle has lower resolution than the one sharing its edge.
@@ -1138,14 +1145,16 @@ void SpaceTimeSampler::colorPointCloud( MySpecialMesh *in_mesh,
                                     color_map_votes_weight[current_color_index+edge_i] = color_map_votes_weight[current_color_index+(edge_res*edge_i/faceRes)];
                                 }
                                 
-                                for(int edge_i=faceRes;edge_i<edge_res;++edge_i)
+                                if(b_computeAdj)
                                 {
-                                    removeAdjacencyVertex(edge_i,adjListMat);
+                                    for(int edge_i=faceRes;edge_i<edge_res;++edge_i)
+                                    {
+                                        removeAdjacencyVertex(edge_i,adjListMat);
+                                    }
+                                    removeAdjacencyEdge(point_indices[triverts[vI2]],current_color_index+edge_res-1, adjListMat,adjMatInd);
+                                    removeAdjacencyEdge(current_color_index+faceRes-1,current_color_index+faceRes, adjListMat,adjMatInd);
+                                    addAdjacencyEdge(point_indices[triverts[vI2]],current_color_index+faceRes-1, adjListMat,adjMatInd);
                                 }
-                                removeAdjacencyEdge(point_indices[triverts[vI2]],current_color_index+edge_res-1, adjListMat,adjMatInd);
-                                removeAdjacencyEdge(current_color_index+faceRes-1,current_color_index+faceRes, adjListMat,adjMatInd);
-                                addAdjacencyEdge(point_indices[triverts[vI2]],current_color_index+faceRes-1, adjListMat,adjMatInd);
-                                
                             }
                             edge_res=color_map_votes[current_color_index][0](0);
                             if((edgeSampInd*edge_res)%faceRes==0)          //if the edge has a lower resolution than the face, only add vote if the current edge point is a sample
@@ -1214,113 +1223,117 @@ void SpaceTimeSampler::colorPointCloud( MySpecialMesh *in_mesh,
     }
 
     log(ALWAYS)<<"Dead pixels remaining: "<<uselessPixels<<endLog();
-    log(ALWAYS)<<"Filling adjacency matrix"<<endLog();
-    //loop over triangles again to fill adjacency matrix for edge-face pairs
-    //#pragma omp parallel for schedule(dynamic)
-    for(int32_t tri = 0; tri <triangles.size(); ++tri) //For every kept triangle
+    
+    if (b_computeAdj)
     {
-        unsigned short faceRes = out_face_res[tri];
-        unsigned long faceInd = out_face_color_ind[tri];
-        //get edgeRes
-        int s0=1;
-        int s1=1;
-        int s2=1;
-        int idx[2];
-        int i1, i2;
-        if(out_edge_color_ind[tri](0)<0)
-            s0=-1;
-        if(out_edge_color_ind[tri](1)<0)
-            s1=-1;
-        if(out_edge_color_ind[tri](2)<0)
-            s2=-1;
-        int32_t eI0 = edge_indices[std::abs(out_edge_color_ind[tri](0))];
-        int edgeRes0 = color_map_votes[eI0][0](0);
-        int32_t eI1 = edge_indices[std::abs(out_edge_color_ind[tri](1))];
-        int edgeRes1 = color_map_votes[eI1][0](0);
-        int32_t eI2 = edge_indices[std::abs(out_edge_color_ind[tri](2))];
-        int edgeRes2 = color_map_votes[eI2][0](0);
-        //First, add edge-to-edge links next to vertices
-        if(edgeRes0>=2)
+        log(ALWAYS)<<"Filling adjacency matrix"<<endLog();
+        //loop over triangles again to fill adjacency matrix for edge-face pairs
+        //#pragma omp parallel for schedule(dynamic)
+        for(int32_t tri = 0; tri <triangles.size(); ++tri) //For every kept triangle
         {
-            if(edgeRes2>=2)
+            unsigned short faceRes = out_face_res[tri];
+            unsigned long faceInd = out_face_color_ind[tri];
+            //get edgeRes
+            int s0=1;
+            int s1=1;
+            int s2=1;
+            int idx[2];
+            int i1, i2;
+            if(out_edge_color_ind[tri](0)<0)
+                s0=-1;
+            if(out_edge_color_ind[tri](1)<0)
+                s1=-1;
+            if(out_edge_color_ind[tri](2)<0)
+                s2=-1;
+            int32_t eI0 = edge_indices[std::abs(out_edge_color_ind[tri](0))];
+            int edgeRes0 = color_map_votes[eI0][0](0);
+            int32_t eI1 = edge_indices[std::abs(out_edge_color_ind[tri](1))];
+            int edgeRes1 = color_map_votes[eI1][0](0);
+            int32_t eI2 = edge_indices[std::abs(out_edge_color_ind[tri](2))];
+            int edgeRes2 = color_map_votes[eI2][0](0);
+            //First, add edge-to-edge links next to vertices
+            if(edgeRes0>=2)
             {
-                i1 = eI0+(edgeRes0+s0*edgeRes0)/2-s0;           //the trick with s_k allows us to write (edgeRes-1 or 1 depending on the sign)
-                i2 = eI2+(edgeRes2-s2*edgeRes2)/2+s2;
+                if(edgeRes2>=2)
+                {
+                    i1 = eI0+(edgeRes0+s0*edgeRes0)/2-s0;           //the trick with s_k allows us to write (edgeRes-1 or 1 depending on the sign)
+                    i2 = eI2+(edgeRes2-s2*edgeRes2)/2+s2;
+                    addAdjacencyEdge(i1,i2,adjListMat,adjMatInd);
+                }
+                if(edgeRes1>=2)
+                {
+                    i1 = eI1+(edgeRes1+s1*edgeRes1)/2-s1;
+                    i2 = eI0+(edgeRes0-s0*edgeRes0)/2+s0;
+                    addAdjacencyEdge(i1,i2,adjListMat,adjMatInd);
+                }
+            }
+            if(edgeRes1>=2 && edgeRes2>=2)
+            {
+                i1 = eI2+(edgeRes2+s2*edgeRes2)/2-s2;
+                i2 = eI1+(edgeRes1-s1*edgeRes1)/2+s1;
                 addAdjacencyEdge(i1,i2,adjListMat,adjMatInd);
             }
-            if(edgeRes1>=2)
-            {
-                i1 = eI1+(edgeRes1+s1*edgeRes1)/2-s1;
-                i2 = eI0+(edgeRes0-s0*edgeRes0)/2+s0;
-                addAdjacencyEdge(i1,i2,adjListMat,adjMatInd);
-            }
-        }
-        if(edgeRes1>=2 && edgeRes2>=2)
-        {
-            i1 = eI2+(edgeRes2+s2*edgeRes2)/2-s2;
-            i2 = eI1+(edgeRes1-s1*edgeRes1)/2+s1;
-            addAdjacencyEdge(i1,i2,adjListMat,adjMatInd);
-        }
 
-        //Then, add links between face and edge samples
-        
-        if(faceRes>2)   //most tedious part...
-        {
-            //3rd edge
-            for(int ei=1;ei<edgeRes2;++ei)
-            {
-                //attach edge to two face samples (and not the other way around)
-                int b0 = ei*(faceRes/edgeRes2);
-                if(b0>1)
-                {
-                    i1 = eI2+(edgeRes2+s2*edgeRes2)/2-s2*ei;                //couple samples (b0,0) & (b0-1,1)
-                    i2 = faceInd+ (b0-2)*faceRes - (b0-1)*b0/2 +1;
-                    addAdjacencyEdge(i1,i2,adjListMat,adjMatInd);
-                }
-                if(b0<faceRes-1)
-                {
-                    i1 = eI2+(edgeRes2+s2*edgeRes2)/2-s2*ei;                //couple samples (b0,0) & (b0,1)
-                    i2 = faceInd + (b0-1)*faceRes - b0*(b0+1)/2 + 1;
-                    addAdjacencyEdge(i1,i2,adjListMat,adjMatInd);
-                }
-            }
+            //Then, add links between face and edge samples
             
-            //2nd edge
-            for(int ei=1;ei<edgeRes1;++ei)
+            if(faceRes>2)   //most tedious part...
             {
-                int b1 = ei*(faceRes/edgeRes1);
-                if(b1>1)
+                //3rd edge
+                for(int ei=1;ei<edgeRes2;++ei)
                 {
-                    i1 = eI1+(edgeRes1-s1*edgeRes1)/2+s1*ei;                                    //couple samples (0,b1) & (1,b1-1)
-                    i2 = faceInd + b1-2;
-                    addAdjacencyEdge(i1,i2,adjListMat,adjMatInd);
+                    //attach edge to two face samples (and not the other way around)
+                    int b0 = ei*(faceRes/edgeRes2);
+                    if(b0>1)
+                    {
+                        i1 = eI2+(edgeRes2+s2*edgeRes2)/2-s2*ei;                //couple samples (b0,0) & (b0-1,1)
+                        i2 = faceInd+ (b0-2)*faceRes - (b0-1)*b0/2 +1;
+                        addAdjacencyEdge(i1,i2,adjListMat,adjMatInd);
+                    }
+                    if(b0<faceRes-1)
+                    {
+                        i1 = eI2+(edgeRes2+s2*edgeRes2)/2-s2*ei;                //couple samples (b0,0) & (b0,1)
+                        i2 = faceInd + (b0-1)*faceRes - b0*(b0+1)/2 + 1;
+                        addAdjacencyEdge(i1,i2,adjListMat,adjMatInd);
+                    }
                 }
-                if(b1<faceRes-1)
+                
+                //2nd edge
+                for(int ei=1;ei<edgeRes1;++ei)
                 {
-                    i1 = eI1+(edgeRes1-s1*edgeRes1)/2+s1*ei;                                    //couple samples (0,b1) & (1,b1)
-                    i2 = faceInd + b1-1;
-                    addAdjacencyEdge(i1,i2,adjListMat,adjMatInd);
+                    int b1 = ei*(faceRes/edgeRes1);
+                    if(b1>1)
+                    {
+                        i1 = eI1+(edgeRes1-s1*edgeRes1)/2+s1*ei;                                    //couple samples (0,b1) & (1,b1-1)
+                        i2 = faceInd + b1-2;
+                        addAdjacencyEdge(i1,i2,adjListMat,adjMatInd);
+                    }
+                    if(b1<faceRes-1)
+                    {
+                        i1 = eI1+(edgeRes1-s1*edgeRes1)/2+s1*ei;                                    //couple samples (0,b1) & (1,b1)
+                        i2 = faceInd + b1-1;
+                        addAdjacencyEdge(i1,i2,adjListMat,adjMatInd);
+                    }
                 }
-            }
 
-            //1st edge
-            for(int ei=1;ei<edgeRes0;++ei)
-            {
-                int b0 = ei*(faceRes/edgeRes0);
-                if(b0>1)
+                //1st edge
+                for(int ei=1;ei<edgeRes0;++ei)
                 {
-                    i1 = eI0+(edgeRes0-s0*edgeRes0)/2+s0*ei;                                  //couple samples (b0,faceRes-b0) & (b0-1,faceRes-b0)
-                    i2 = faceInd+ (b0-1)*faceRes - b0*(b0+1)/2;
-                    addAdjacencyEdge(i1,i2,adjListMat,adjMatInd);
+                    int b0 = ei*(faceRes/edgeRes0);
+                    if(b0>1)
+                    {
+                        i1 = eI0+(edgeRes0-s0*edgeRes0)/2+s0*ei;                                  //couple samples (b0,faceRes-b0) & (b0-1,faceRes-b0)
+                        i2 = faceInd+ (b0-1)*faceRes - b0*(b0+1)/2;
+                        addAdjacencyEdge(i1,i2,adjListMat,adjMatInd);
+                    }
+                    if(b0<faceRes-1)
+                    {
+                        i1 = eI0+(edgeRes0-s0*edgeRes0)/2+s0*ei;                                     //couple samples (b0,faceRes-b0) & (b0,faceRes-b0-1)
+                        i2 = faceInd+ b0*faceRes - (b0+2)*(b0+1)/2;
+                        addAdjacencyEdge(i1,i2,adjListMat,adjMatInd);
+                    }
                 }
-                if(b0<faceRes-1)
-                {
-                    i1 = eI0+(edgeRes0-s0*edgeRes0)/2+s0*ei;                                     //couple samples (b0,faceRes-b0) & (b0,faceRes-b0-1)
-                    i2 = faceInd+ b0*faceRes - (b0+2)*(b0+1)/2;
-                    addAdjacencyEdge(i1,i2,adjListMat,adjMatInd);
-                }
-            }
 
+            }
         }
     }
     
@@ -3560,35 +3573,71 @@ void SpaceTimeSampler::reIndexColors(   MySpecialMesh *in_mesh,
     in_points.push_back(points[curInd]);
     in_colors.push_back(curColor);
     inv_new_ind[curInd]=0;
+    bool noFreeVYet;
+    int minFreeVInd = 1;
     //loop
     while(total_written<points.size())
     {
         float min_dist = 3*255;
-        for(int next_v=0;next_v<points.size();++next_v)
+        noFreeVYet = true;
+        int maxInd = std::min(int(points.size()),minFreeVInd+600);
+        for(int next_v=minFreeVInd;next_v<maxInd;++next_v)
+        // for(int next_v=0;next_v<points.size();++next_v)
+        // for(int next_v=0;next_v<maxInd;++next_v)
+        // for(int next_v=minFreeVInd;next_v<points.size();++next_v)
         {
-            if (is_written[next_v]==0)
+            int testInd = new_ind[next_v];
+            if (is_written[testInd]==0)
             {
+                noFreeVYet=false;
                 //float &colorDist;
-                //getColorDistance(curColor, const vert_colors[next_v],colorDist);
-                const InColor sampColor = vert_colors[next_v];
+                //getColorDistance(curColor, const vert_colors[testInd],colorDist);
+                const InColor sampColor = vert_colors[testInd];
                 float colorDist = getColorDistance(curColor, sampColor);
-                if ((colorDist<min_dist)||(colorDist==min_dist && points_intensity[next_v]<points_intensity[curInd]))
+                if ((colorDist<min_dist)||(colorDist==min_dist))
                 {
                     min_dist=colorDist;
-                    curInd=next_v;
+                    curInd=testInd;
                     if(colorDist==0){
                         break;
                     }
                 }
             }
+            else if(noFreeVYet)
+            {
+                if(minFreeVInd!=next_v)
+                {
+                    log(ERROR)<<"FAILLLLLL"<<endLog();
+                }
+                minFreeVInd += 1;
+            }
         }
-        is_written[curInd]=1;
-        curColor = vert_colors[curInd];
-        in_points.push_back(points[curInd]);
-        in_colors.push_back(curColor);
-        inv_new_ind[curInd]=total_written;
-        ++total_written;
+        // if(is_written[curInd]==1)
+        // {
+        //     log(ERROR)<<"ERROR! no new vertex selected!?"<<endLog();
+        //     log(ALWAYS)<<"minFreeVInd = "<<minFreeVInd<<endLog();
+        //     log(ALWAYS)<<"Total written: "<<total_written<<endLog();
+        //     log(ALWAYS)<<"Max ind: "<<maxInd<<endLog();
+        //     log(ALWAYS)<<"min_dist = "<<min_dist<<endLog();
+        //     log(ALWAYS)<<"curInd = "<<curInd<<endLog();
+        // }
+        if(is_written[curInd]==0)
+        {
+            is_written[curInd]=1;
+            curColor = vert_colors[curInd];
+            in_points.push_back(points[curInd]);
+            in_colors.push_back(curColor);
+            inv_new_ind[curInd]=total_written;
+            ++total_written;
+        }
     }
+
+    // // Faster alternative: just take intensity ordering
+    // for(int curV=0;curV<points.size();++curV)
+    // {
+    //     in_points.push_back
+    // }
+
     
     log(ALWAYS)<<"in_colors size: "<<in_colors.size()<<endLog();
     //reindex triangles with new vertices order

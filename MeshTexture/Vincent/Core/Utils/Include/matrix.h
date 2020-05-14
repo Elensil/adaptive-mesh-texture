@@ -57,7 +57,7 @@ typedef glm::dvec4   GLM_Vec4;
 #define PROJ_MARGIN_DEPTH_TH 0.03;
 
 // You might want to tweak these:
-#define MAX_FACE_RES 32 						// Maximum face resolution.
+#define MAX_FACE_RES 16 						// Maximum face resolution.
 #define DOWNSAMPLE_THRESHOLD 30 				// Parameter th in the paper
 #define FACE_RES_RATIO 3 						// Parameter ? in the paper
 
