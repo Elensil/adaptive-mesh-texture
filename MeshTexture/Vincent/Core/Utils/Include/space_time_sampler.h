@@ -667,9 +667,6 @@ void SpaceTimeSampler::colorPointCloud( MySpecialMesh *in_mesh,
 
     //constitute a matrix of intensity value per (vertex,camera)
     std::vector<std::vector<float> > vertex_cam_intensity(points.size(), std::vector<float> (v_cameras_.size(),0.0f));
-    std::vector<std::vector<float> > vertex_cam_red(points.size(), std::vector<float> (v_cameras_.size(),0.0f));
-    std::vector<std::vector<float> > vertex_cam_green(points.size(), std::vector<float> (v_cameras_.size(),0.0f));
-    std::vector<std::vector<float> > vertex_cam_blue(points.size(), std::vector<float> (v_cameras_.size(),0.0f));
     std::vector<std::vector<float> > vertex_cam_weight(points.size(), std::vector<float> (v_cameras_.size(),0.0f));
     
     //compute a color per (vertex,camera).
@@ -684,26 +681,16 @@ void SpaceTimeSampler::colorPointCloud( MySpecialMesh *in_mesh,
                 if(std::find(vertices_cam[triangles[tri].ref].begin(), vertices_cam[triangles[tri].ref].end(), sample_camera_number[tri][i]) != vertices_cam[triangles[tri].ref].end())
                 {
                     vertex_cam_intensity[triangles[tri].ref][sample_camera_number[tri][i]] += float(colors[tri][i].sum())*incidence_weight[tri][i]*barycoords[tri][i](0)/765;   //765 = 255 *3
-                    vertex_cam_red[triangles[tri].ref][sample_camera_number[tri][i]] += float(colors[tri][i](0))*incidence_weight[tri][i]*barycoords[tri][i](0)/255;
-                    vertex_cam_green[triangles[tri].ref][sample_camera_number[tri][i]] += float(colors[tri][i](1))*incidence_weight[tri][i]*barycoords[tri][i](0)/255;
-                    vertex_cam_blue[triangles[tri].ref][sample_camera_number[tri][i]] += float(colors[tri][i](2))*incidence_weight[tri][i]*barycoords[tri][i](0)/255;
-                    
                     vertex_cam_weight[triangles[tri].ref][sample_camera_number[tri][i]] += incidence_weight[tri][i]*barycoords[tri][i](0);
                 }
                 if(std::find(vertices_cam[triangles[tri].edge1].begin(), vertices_cam[triangles[tri].edge1].end(), sample_camera_number[tri][i]) != vertices_cam[triangles[tri].edge1].end())
                 {
                     vertex_cam_intensity[triangles[tri].edge1][sample_camera_number[tri][i]] += float(colors[tri][i].sum())*incidence_weight[tri][i]*barycoords[tri][i](1)/765;
-                    vertex_cam_red[triangles[tri].ref][sample_camera_number[tri][i]] += float(colors[tri][i](0))*incidence_weight[tri][i]*barycoords[tri][i](1)/255;
-                    vertex_cam_green[triangles[tri].ref][sample_camera_number[tri][i]] += float(colors[tri][i](1))*incidence_weight[tri][i]*barycoords[tri][i](1)/255;
-                    vertex_cam_blue[triangles[tri].ref][sample_camera_number[tri][i]] += float(colors[tri][i](2))*incidence_weight[tri][i]*barycoords[tri][i](1)/255;
                     vertex_cam_weight[triangles[tri].edge1][sample_camera_number[tri][i]] += incidence_weight[tri][i]*barycoords[tri][i](1);
                 }
                 if(std::find(vertices_cam[triangles[tri].edge2].begin(), vertices_cam[triangles[tri].edge2].end(), sample_camera_number[tri][i]) != vertices_cam[triangles[tri].edge2].end())
                 {
                     vertex_cam_intensity[triangles[tri].edge2][sample_camera_number[tri][i]] += float(colors[tri][i].sum())*incidence_weight[tri][i]*barycoords[tri][i](2)/765;
-                    vertex_cam_red[triangles[tri].ref][sample_camera_number[tri][i]] += float(colors[tri][i](0))*incidence_weight[tri][i]*barycoords[tri][i](2)/255;
-                    vertex_cam_green[triangles[tri].ref][sample_camera_number[tri][i]] += float(colors[tri][i](1))*incidence_weight[tri][i]*barycoords[tri][i](2)/255;
-                    vertex_cam_blue[triangles[tri].ref][sample_camera_number[tri][i]] += float(colors[tri][i](2))*incidence_weight[tri][i]*barycoords[tri][i](2)/255;
                     vertex_cam_weight[triangles[tri].edge2][sample_camera_number[tri][i]] += incidence_weight[tri][i]*barycoords[tri][i](2);
                 }
             }
@@ -716,9 +703,6 @@ void SpaceTimeSampler::colorPointCloud( MySpecialMesh *in_mesh,
             if(vertex_cam_weight[v][cam]>0.0f)
             {
                 vertex_cam_intensity[v][cam] = vertex_cam_intensity[v][cam]/vertex_cam_weight[v][cam];
-                vertex_cam_red[v][cam] = vertex_cam_red[v][cam]/vertex_cam_weight[v][cam];
-                vertex_cam_green[v][cam] = vertex_cam_green[v][cam]/vertex_cam_weight[v][cam];
-                vertex_cam_blue[v][cam] = vertex_cam_blue[v][cam]/vertex_cam_weight[v][cam];
             }
         }
 
@@ -730,9 +714,6 @@ void SpaceTimeSampler::colorPointCloud( MySpecialMesh *in_mesh,
     std::vector<float> hidden_vertex_green(points.size(),0);
     std::vector<float> hidden_vertex_blue(points.size(),0);
     std::vector<float> camera_K(v_cameras_.size(),1);               //camera coeficients initialized
-    std::vector<float> camera_K_r(v_cameras_.size(),1);
-    std::vector<float> camera_K_g(v_cameras_.size(),1);
-    std::vector<float> camera_K_b(v_cameras_.size(),1);
     //intialize vertices intensity
     for(int v=0;v<points.size();++v)
     {
@@ -740,9 +721,6 @@ void SpaceTimeSampler::colorPointCloud( MySpecialMesh *in_mesh,
         while(vertex_cam_weight[v][cam]==0.0f)
             ++cam;
         hidden_vertex_intensity[v]=vertex_cam_intensity[v][cam];
-        hidden_vertex_red[v]=vertex_cam_red[v][cam];
-        hidden_vertex_green[v]=vertex_cam_green[v][cam];
-        hidden_vertex_blue[v]=vertex_cam_blue[v][cam];
     }
     float gamma = 0.1;
     for (int it=0;it<1000;++it) //used to be 2000. TODO: add a data term
@@ -751,32 +729,19 @@ void SpaceTimeSampler::colorPointCloud( MySpecialMesh *in_mesh,
         for (int v=0;v<points.size();++v)   //first, update each hidden intensity value in turn
         {
             float df=0.0f;
-            float df_r=0.0f;
-            float df_g=0.0f;
-            float df_b=0.0f;
             float samp_n=0;
             for(int cam=0;cam<v_cameras_.size();++cam)  //compute derivative / Iv (i.e. intensity at vertex v)
             {
                 if(vertex_cam_weight[v][cam]>0.0f)
                 {
                     df += (camera_K[cam]*hidden_vertex_intensity[v]-vertex_cam_intensity[v][cam])*camera_K[cam]*vertex_cam_weight[v][cam];
-                    df_r += (camera_K_r[cam]*hidden_vertex_red[v]-vertex_cam_red[v][cam])*camera_K_r[cam]*vertex_cam_weight[v][cam];
-                    df_g += (camera_K_g[cam]*hidden_vertex_green[v]-vertex_cam_green[v][cam])*camera_K_g[cam]*vertex_cam_weight[v][cam];
-                    df_b += (camera_K_b[cam]*hidden_vertex_blue[v]-vertex_cam_blue[v][cam])*camera_K_b[cam]*vertex_cam_weight[v][cam];
-                    
                     samp_n+= vertex_cam_weight[v][cam];
 
                 }
             }
             if(samp_n>0)
                 df=df/samp_n;
-                df_r=df_r/samp_n;
-                df_g=df_g/samp_n;
-                df_b=df_b/samp_n;
             hidden_vertex_intensity[v] += -gamma*df;
-            hidden_vertex_red[v] += -gamma*df_r;
-            hidden_vertex_green[v] += -gamma*df_g;
-            hidden_vertex_blue[v] += -gamma*df_b;
 
         }
         
@@ -784,30 +749,18 @@ void SpaceTimeSampler::colorPointCloud( MySpecialMesh *in_mesh,
         for (int cam=0;cam<v_cameras_.size();++cam)     //then, do the same with camera factors
         {
             float df=0.0f;
-            float df_r=0.0f;
-            float df_g=0.0f;
-            float df_b=0.0f;
             float samp_n=0;
             for(int v=0;v<points.size();++v)
             {
                 if(vertex_cam_weight[v][cam]>0.0f)
                 {
                     df += (camera_K[cam]*hidden_vertex_intensity[v]-vertex_cam_intensity[v][cam])*hidden_vertex_intensity[v]*vertex_cam_weight[v][cam];
-                    df_r += (camera_K_r[cam]*hidden_vertex_red[v]-vertex_cam_red[v][cam])*hidden_vertex_red[v]*vertex_cam_weight[v][cam];
-                    df_g += (camera_K_g[cam]*hidden_vertex_green[v]-vertex_cam_green[v][cam])*hidden_vertex_green[v]*vertex_cam_weight[v][cam];
-                    df_b += (camera_K_b[cam]*hidden_vertex_blue[v]-vertex_cam_blue[v][cam])*hidden_vertex_blue[v]*vertex_cam_weight[v][cam];
                     samp_n+= vertex_cam_weight[v][cam];
                 }
             }
             if(samp_n>0)
                 df=df/samp_n;
-                df_r=df_r/samp_n;
-                df_g=df_g/samp_n;
-                df_b=df_b/samp_n;
             camera_K[cam] += -gamma*df;
-            camera_K_r[cam] += -gamma*df_r;
-            camera_K_g[cam] += -gamma*df_g;
-            camera_K_b[cam] += -gamma*df_b;
         }
         if(it==800)
         {
@@ -848,587 +801,6 @@ void SpaceTimeSampler::colorPointCloud( MySpecialMesh *in_mesh,
         }
     }
     return;
-    time_begin  = boost::posix_time::microsec_clock::local_time();
-    //Filter and weight votes based on this
-    for(int32_t tri = 0; tri <triangles.size(); ++tri)
-    {
-        std::vector<float> new_weights;
-        std::vector<OutColor> new_colors;
-        std::vector<Vector3f> new_bary_coords;
-        std::vector<short> new_sample_camera_number;
-        for(int i=0; i<colors[tri].size();++i)      //for each vote
-        {
-            float myWeight=0.0f;
-            //1st version here takes the number of camera occurences per vertex to compute weights.
-            //*
-            int currentCam = 0;
-            while(currentCam<vertices_cam[triangles[tri].ref].size())
-            {
-                if(vertices_cam[triangles[tri].ref][currentCam] == sample_camera_number[tri][i]){
-                    if(barycoords[tri][i](0)>0)
-                        myWeight += incidence_weight[tri][i]*barycoords[tri][i](0);
-                }
-                ++currentCam;
-            }
-            currentCam = 0;
-            while(currentCam<vertices_cam[triangles[tri].edge1].size())
-            {
-                if(vertices_cam[triangles[tri].edge1][currentCam] == sample_camera_number[tri][i]){
-                    if(barycoords[tri][i](1)>0)
-                        myWeight += incidence_weight[tri][i]*barycoords[tri][i](1);
-                }
-                ++currentCam;
-            }
-            currentCam = 0;
-            while(currentCam<vertices_cam[triangles[tri].edge2].size())
-            {
-                if(vertices_cam[triangles[tri].edge2][currentCam] == sample_camera_number[tri][i]){
-                    if(barycoords[tri][i](2)>0)
-                        myWeight += incidence_weight[tri][i]*barycoords[tri][i](2);
-                }
-                ++currentCam;
-            }
-
-            if(myWeight>0.0f)
-            {
-                new_weights.push_back(myWeight);
-                OutColor testSmth;
-                //can go beyond 255 because of camera intensity corrections (right?)
-                testSmth(0)= int(float(colors[tri][i](0))/camera_K[sample_camera_number[tri][i]]);
-                testSmth(0)=std::min(255,std::max(0,int(testSmth(0))));
-                testSmth(1)= int(float(colors[tri][i](1))/camera_K[sample_camera_number[tri][i]]);
-                testSmth(1)=std::min(255,std::max(0,int(testSmth(1))));
-                testSmth(2)= int(float(colors[tri][i](2))/camera_K[sample_camera_number[tri][i]]);
-                testSmth(2)=std::min(255,std::max(0,int(testSmth(2))));
-                new_colors.push_back(testSmth);
-
-                new_bary_coords.push_back(barycoords[tri][i]);
-                new_sample_camera_number.push_back(sample_camera_number[tri][i]);
-                total_cam_weight[sample_camera_number[tri][i]] += myWeight;
-            }
-        }
-        incidence_weight[tri]=new_weights;
-        colors[tri]=new_colors;
-        barycoords[tri]=new_bary_coords;
-        sample_camera_number[tri] = new_sample_camera_number;
-    }
-
-    time_diff = boost::posix_time::microsec_clock::local_time() - time_begin;
-    log(ALWAYS)<<"[SpaceTimeSampler] : Filter and correct votes: "<<int(float(time_diff.total_milliseconds())/1000)<<" s"<<endLog();
-
-    // Filtering cameras complete
-    // -----------------------------------------------------------
-
-
-    log(ALWAYS)<<"[SpaceTimeSampler] : Starting voting process..."<<endLog();
-
-    time_begin  = boost::posix_time::microsec_clock::local_time();
-
-    std::vector<size_t> edge_indices;               //temp vector to store a list of edges with their color indices
-    edge_indices.clear();                           //makes color reindexing easier down the road
-    edge_indices.reserve(triangles.size()*3/2);
-    edge_indices.push_back(0);
-
-
-    int uselessPixels=0;    //counter for pixels being freed when an edge changes resolution
-
-    std::vector<unsigned int> votes_num(colors.size());
-    for(int32_t tri = 0; tri <triangles.size(); ++tri) //For every kept triangle
-    {
-        votes_num[tri] = colors[tri].size();
-    }
-    colors.clear();
-    barycoords.clear();
-    sample_camera_number.clear();
-    incidence_weight.clear();
-
-    for(int32_t tri = 0; tri <triangles.size(); ++tri) //For every kept triangle
-    {
-        int idx[2];
-        int32_t i1, i2;
-        //define some local loop variable, to make the code clearer
-        if(new_triangle_index[tri] >= -1)
-        {
-            long current_color_index;
-
-            unsigned short faceRes=1;
-            
-            if(faceResParam==0)
-            {
-                faceRes=default_face_res;
-            }
-            else
-            {
-                float tri_score = *max_element(voting_cameras_weight[tri].begin(), voting_cameras_weight[tri].end());       //See paper for justification
-                // while (2*votes_num[tri]>faceRes*faceRes*faceResParam)                   
-                while(2*tri_score>faceRes*faceRes*faceResParam)
-                {       
-                    ++faceRes;  
-                }
-                if(faceRes>1)
-                {
-                    --faceRes;
-                }
-                while (not ((faceRes & (faceRes-1)) == 0))       //we want face resolutions to be powers of 2
-                {
-                    faceRes+=1; //WARNING: changed from truncating to taking upper value!
-                }
-            }
-
-            faceRes=std::min(faceRes,default_face_res);
-
-            unsigned long face_color_index=color_index_pointer;   //reserve space to write this face's colors
-            if(faceRes==1||faceRes==2)
-                face_color_index=0;
-            color_index_pointer+=(faceRes-1)*(faceRes-2)/2;
-            
-            //fill adjacency matrix for face samples
-            for(int b0=1; b0<=faceRes-1;++b0)
-                for(int b1=1; b1<=faceRes-1-b0;++b1)
-                {
-                    if(faceRes-b0-b1==0)    //make sure we're not on the last edge
-                    {
-                        continue;
-                    }
-                    current_color_index = face_color_index + (b0-1)*faceRes - (b0+1)*b0/2 +1 + (b1-1);
-                    if(b_computeAdj)
-                    {
-                        if(b1<faceRes-1-b0)    //not last sample on its 'line'
-                        {
-                            i1 = current_color_index;
-                            i2 = current_color_index+1;
-                            addAdjacencyEdge(i1,i2,adjListMat,adjMatInd);
-                        }
-                        if(b0<faceRes-1)
-                        {
-                            if(b0+b1<faceRes-1)
-                            {
-
-                                i1 = current_color_index;
-                                i2 = current_color_index+faceRes-(b0-1)-2;
-                                addAdjacencyEdge(i1,i2,adjListMat,adjMatInd);
-                            }
-                            if(b1>1)
-                            {
-
-                                i1 = current_color_index;
-                                i2 = current_color_index+faceRes-(b0-1)-3;
-                                addAdjacencyEdge(i1,i2,adjListMat,adjMatInd);
-                            }
-                        }
-                    }
-                }
-
-            
-            InTriangle &triangle = kept_triangles[new_triangle_index[tri]];
-            triverts[0] = triangle.ref;
-            triverts[1] = triangle.edge1;
-            triverts[2] = triangle.edge2;
-            Vector3li edge_ind = Vector3li(0,0,0);
-            int edge_num, edge_res;
-            for(int j=0;j<3;++j)
-            {
-                if(point_indices[triverts[j]] == -1)         //vertex not saved in new vector vector yet. Add it
-                {
-                    //Save index and vertex in new vectors
-                    point_indices[triverts[j]] = in_points.size();
-                    in_points.push_back(points[triverts[j]]);
-                }
-            }
-
-            //Go get color in the input images, rather than projecting votes on the surface
-            //*
-            for(int b0=0;b0<=faceRes;++b0)
-            {
-                for(int b1=0;b1<=faceRes-b0;++b1)
-                {
-                    current_color_index=-1;
-                    vI = -1;    //dirty trick to save code... Useful for now
-                    vI2 = -1;
-                    if(b0==faceRes)     //1st vertex
-                    {
-                        current_color_index=point_indices[triverts[0]];
-                    }
-                    else if(b1==faceRes)    //2nd vertex
-                    {
-                        current_color_index=point_indices[triverts[1]];
-                    }
-                    else if((b0==0)&&(b1==0))   //3rd vertex
-                    {
-                        current_color_index=point_indices[triverts[2]];
-                    }
-                    else
-                    {
-                        int edgeSampInd=-1;
-                        if(b0==0)   //2nd edge (v3,v2)
-                        {
-                            vI=2;
-                            vI2=1;
-                            edge_num=1;
-                            edgeSampInd=b1;
-                        }
-                        else if (b1==0)     //3rd edge (v1,v3)
-                        {
-                            vI=0;
-                            vI2=2;
-                            edge_num=2;
-                            edgeSampInd=faceRes-b0;
-                        }
-                        else if (b0+b1==faceRes)     //1st edge, (v2,v1)
-                        {
-                            vI=1;
-                            vI2=0;
-                            edge_num=0;
-                            edgeSampInd=b0;
-                        }
-
-                        if(vI>=0)
-                        {
-                            it = edge_map.find(std::pair<int,int>(triverts[vI],triverts[vI2]));
-                            if(it!=edge_map.end())          //existing edge case
-                            {
-                                current_color_index = edge_indices[(it->second).first];    //get color index from edge map
-                                edge_ind(edge_num,0)=(it->second).first;
-                            }
-                            else
-                            {
-                                it = edge_map.find(std::make_pair(triverts[vI2],triverts[vI]));
-                                if(it!=edge_map.end())      //inverted edge case
-                                {
-                                    int temp = vI;      //does this work as intended?
-                                    vI = vI2;
-                                    vI2=temp;
-                                    current_color_index = edge_indices[(it->second).first];    //get color index from edge map
-                                    edge_ind(edge_num,0)=-(it->second).first;
-                                }
-                                else    //not recorded yet
-                                {
-                                    current_color_index = color_index_pointer;
-                                    edge_ind(edge_num,0)=edge_indices.size();
-                                    
-                                    edge_map.insert(std::pair<std::pair<int,int>,std::pair<int,int> >(std::pair<int,int>(triverts[vI],triverts[vI2]),std::pair<int,int>(edge_indices.size(),faceRes)));
-                                    edge_indices.push_back(color_index_pointer);
-                                    color_index_pointer+=faceRes;   //faceRes-1 color samples + 1 value for edge Res
-                                    //Display edge res in cyan for debugging
-                                    color_map_votes[current_color_index].push_back(OutColor(faceRes,255,255));      //record edgeRes
-                                    color_map_votes_weight[current_color_index].push_back(1);
-                                    //here, we put blue and green canal to the value of an edge vote, to minimize diskspace (useful?)
-                                    //fill adjacency matrix for edge samples:
-                                    if(b_computeAdj)
-                                    {
-                                        // edge-edge
-                                        for(int adj=1;adj<faceRes-1;++adj)  //watch out for 'edge res' index
-                                        {
-                                            i1 = current_color_index+adj;
-                                            i2 = current_color_index+adj+1;
-                                            addAdjacencyEdge(i1,i2,adjListMat,adjMatInd);
-                                        }
-                                        //vertex-edge
-                                        i1 = point_indices[triverts[vI]];
-                                        i2 = current_color_index+1;
-                                        addAdjacencyEdge(i1,i2,adjListMat,adjMatInd);
-                                        i1 = point_indices[triverts[vI2]];
-                                        i2 = current_color_index+faceRes-1;
-                                        addAdjacencyEdge(i1,i2,adjListMat,adjMatInd);
-                                        
-                                        //face-edge: dealt with later
-                                    }
-                                }
-                            }
-                            if(color_map_votes[current_color_index][0](0)>faceRes){        //this triangle has lower resolution than the one sharing its edge.
-                                uselessPixels+=color_map_votes[current_color_index][0](0)-faceRes;
-                                edge_res=color_map_votes[current_color_index][0](0);    //In this case, we choose the lower resolution for this edge, for a more consistent looking image
-                                color_map_votes[current_color_index][0](0)=faceRes;
-
-                                for(int edge_i=1;edge_i<=faceRes-1;edge_i++){            //Drop extra samples and move the "good" ones to their new place
-                                    color_map_votes[current_color_index+edge_i] = color_map_votes[current_color_index+(edge_res*edge_i/faceRes)];
-                                    color_map_votes_weight[current_color_index+edge_i] = color_map_votes_weight[current_color_index+(edge_res*edge_i/faceRes)];
-                                }
-                                
-                                if(b_computeAdj)
-                                {
-                                    for(int edge_i=faceRes;edge_i<edge_res;++edge_i)
-                                    {
-                                        removeAdjacencyVertex(edge_i,adjListMat);
-                                    }
-                                    removeAdjacencyEdge(point_indices[triverts[vI2]],current_color_index+edge_res-1, adjListMat,adjMatInd);
-                                    removeAdjacencyEdge(current_color_index+faceRes-1,current_color_index+faceRes, adjListMat,adjMatInd);
-                                    addAdjacencyEdge(point_indices[triverts[vI2]],current_color_index+faceRes-1, adjListMat,adjMatInd);
-                                }
-                            }
-                            edge_res=color_map_votes[current_color_index][0](0);
-                            if((edgeSampInd*edge_res)%faceRes==0)          //if the edge has a lower resolution than the face, only add vote if the current edge point is a sample
-                            {
-                                current_color_index+=edgeSampInd*edge_res/faceRes;     // (-1 +1 because of 1st value used for the edgeRes)
-                            }
-                            else
-                            {
-                                current_color_index=-1;     //don't do anything
-                            }
-                            if(edge_ind(edge_num,0)<0)
-                            {
-                                current_color_index=-1;
-                            }
-                        }
-                        //edge case taken care of. Only the face to go!!
-                        else
-                        {
-                            current_color_index = face_color_index + (b0-1)*faceRes - (b0*(b0+1))/2 +1 + (b1-1);
-                        }
-                    }
-                    if(current_color_index>=0)
-                    {
-                        float lambda1 = float(b0)/float(faceRes);
-                        float lambda2 = float(b1)/float(faceRes);
-                        float lambda3 = 1-lambda1-lambda2;
-                        Vector3f myBarycoords = Vector3f(lambda1,lambda2,lambda3);
-                        for(int verNum=0;verNum<3;++verNum)     //for each vertex
-                        {
-                            for(int myCam=0;myCam<vertices_cam[triverts[verNum]].size();++myCam)
-                            {
-                                int camNum = vertices_cam[triverts[verNum]][myCam];
-                                OutColor inputColor=OutColor(0,0,0);
-                                bool is_safe=true;
-                                if(tri==-1)
-                                {
-
-                                }
-                                else
-                                {
-                                    is_safe = getSurfacePointColor(triangle, points, myBarycoords,camNum,inputColor, false, bInputDownsampled);
-
-                                }
-                                if(is_safe)
-                                {
-                                    inputColor(0) = (unsigned int)(std::min(255.0f,std::max(0.0f,float(inputColor(0))/camera_K[camNum])));
-                                    inputColor(1) = (unsigned int)(std::min(255.0f,std::max(0.0f,float(inputColor(1))/camera_K[camNum])));
-                                    inputColor(2) = (unsigned int)(std::min(255.0f,std::max(0.0f,float(inputColor(2))/camera_K[camNum])));
-                                    color_map_votes[current_color_index].push_back(inputColor);
-                                    color_map_votes_weight[current_color_index].push_back(myBarycoords(verNum));
-                                }
-                            }
-                        }
-                    }
-                }
-            }
-            //Update triangle
-            triangle.ref = point_indices[triangle.ref];
-            triangle.edge1 = point_indices[triangle.edge1];
-            triangle.edge2 = point_indices[triangle.edge2];
-            in_faces.push_back(triangle);
-            out_face_res.push_back(faceRes);
-            out_face_color_ind.push_back(face_color_index);
-            out_edge_color_ind.push_back(edge_ind);
-        }
-    }
-
-    log(ALWAYS)<<"Dead pixels remaining: "<<uselessPixels<<endLog();
-    
-    if (b_computeAdj)
-    {
-        log(ALWAYS)<<"Filling adjacency matrix"<<endLog();
-        //loop over triangles again to fill adjacency matrix for edge-face pairs
-        //#pragma omp parallel for schedule(dynamic)
-        for(int32_t tri = 0; tri <triangles.size(); ++tri) //For every kept triangle
-        {
-            unsigned short faceRes = out_face_res[tri];
-            unsigned long faceInd = out_face_color_ind[tri];
-            //get edgeRes
-            int s0=1;
-            int s1=1;
-            int s2=1;
-            int idx[2];
-            int i1, i2;
-            if(out_edge_color_ind[tri](0)<0)
-                s0=-1;
-            if(out_edge_color_ind[tri](1)<0)
-                s1=-1;
-            if(out_edge_color_ind[tri](2)<0)
-                s2=-1;
-            int32_t eI0 = edge_indices[std::abs(out_edge_color_ind[tri](0))];
-            int edgeRes0 = color_map_votes[eI0][0](0);
-            int32_t eI1 = edge_indices[std::abs(out_edge_color_ind[tri](1))];
-            int edgeRes1 = color_map_votes[eI1][0](0);
-            int32_t eI2 = edge_indices[std::abs(out_edge_color_ind[tri](2))];
-            int edgeRes2 = color_map_votes[eI2][0](0);
-            //First, add edge-to-edge links next to vertices
-            if(edgeRes0>=2)
-            {
-                if(edgeRes2>=2)
-                {
-                    i1 = eI0+(edgeRes0+s0*edgeRes0)/2-s0;           //the trick with s_k allows us to write (edgeRes-1 or 1 depending on the sign)
-                    i2 = eI2+(edgeRes2-s2*edgeRes2)/2+s2;
-                    addAdjacencyEdge(i1,i2,adjListMat,adjMatInd);
-                }
-                if(edgeRes1>=2)
-                {
-                    i1 = eI1+(edgeRes1+s1*edgeRes1)/2-s1;
-                    i2 = eI0+(edgeRes0-s0*edgeRes0)/2+s0;
-                    addAdjacencyEdge(i1,i2,adjListMat,adjMatInd);
-                }
-            }
-            if(edgeRes1>=2 && edgeRes2>=2)
-            {
-                i1 = eI2+(edgeRes2+s2*edgeRes2)/2-s2;
-                i2 = eI1+(edgeRes1-s1*edgeRes1)/2+s1;
-                addAdjacencyEdge(i1,i2,adjListMat,adjMatInd);
-            }
-
-            //Then, add links between face and edge samples
-            
-            if(faceRes>2)   //most tedious part...
-            {
-                //3rd edge
-                for(int ei=1;ei<edgeRes2;++ei)
-                {
-                    //attach edge to two face samples (and not the other way around)
-                    int b0 = ei*(faceRes/edgeRes2);
-                    if(b0>1)
-                    {
-                        i1 = eI2+(edgeRes2+s2*edgeRes2)/2-s2*ei;                //couple samples (b0,0) & (b0-1,1)
-                        i2 = faceInd+ (b0-2)*faceRes - (b0-1)*b0/2 +1;
-                        addAdjacencyEdge(i1,i2,adjListMat,adjMatInd);
-                    }
-                    if(b0<faceRes-1)
-                    {
-                        i1 = eI2+(edgeRes2+s2*edgeRes2)/2-s2*ei;                //couple samples (b0,0) & (b0,1)
-                        i2 = faceInd + (b0-1)*faceRes - b0*(b0+1)/2 + 1;
-                        addAdjacencyEdge(i1,i2,adjListMat,adjMatInd);
-                    }
-                }
-                
-                //2nd edge
-                for(int ei=1;ei<edgeRes1;++ei)
-                {
-                    int b1 = ei*(faceRes/edgeRes1);
-                    if(b1>1)
-                    {
-                        i1 = eI1+(edgeRes1-s1*edgeRes1)/2+s1*ei;                                    //couple samples (0,b1) & (1,b1-1)
-                        i2 = faceInd + b1-2;
-                        addAdjacencyEdge(i1,i2,adjListMat,adjMatInd);
-                    }
-                    if(b1<faceRes-1)
-                    {
-                        i1 = eI1+(edgeRes1-s1*edgeRes1)/2+s1*ei;                                    //couple samples (0,b1) & (1,b1)
-                        i2 = faceInd + b1-1;
-                        addAdjacencyEdge(i1,i2,adjListMat,adjMatInd);
-                    }
-                }
-
-                //1st edge
-                for(int ei=1;ei<edgeRes0;++ei)
-                {
-                    int b0 = ei*(faceRes/edgeRes0);
-                    if(b0>1)
-                    {
-                        i1 = eI0+(edgeRes0-s0*edgeRes0)/2+s0*ei;                                  //couple samples (b0,faceRes-b0) & (b0-1,faceRes-b0)
-                        i2 = faceInd+ (b0-1)*faceRes - b0*(b0+1)/2;
-                        addAdjacencyEdge(i1,i2,adjListMat,adjMatInd);
-                    }
-                    if(b0<faceRes-1)
-                    {
-                        i1 = eI0+(edgeRes0-s0*edgeRes0)/2+s0*ei;                                     //couple samples (b0,faceRes-b0) & (b0,faceRes-b0-1)
-                        i2 = faceInd+ b0*faceRes - (b0+2)*(b0+1)/2;
-                        addAdjacencyEdge(i1,i2,adjListMat,adjMatInd);
-                    }
-                }
-
-            }
-        }
-    }
-    
-    log(ALWAYS)<<"[SpaceTimeSampler] : triangles size "<<triangles.size()<<endLog();
-    log(ALWAYS)<<"[SpaceTimeSampler] : in_faces size "<<in_faces.size()<<endLog();
-
-    time_diff = boost::posix_time::microsec_clock::local_time() - time_begin;
-    log(ALWAYS)<<"[SpaceTimeSampler] : Distribute votes on samples: "<<int(float(time_diff.total_milliseconds())/1000)<<" s"<<endLog();
-
-
-    // ***********************************************
-    // ***              1ST STEP                   ***
-    // ***********************************************
-    out_colors.resize(color_index_pointer);
-    color_map_votes.resize(color_index_pointer);
-    color_map_votes_weight.resize(color_index_pointer);
-    // samples_adj.resize(color_index_pointer);
-
-    //filterCameraVotes(color_map_votes, color_map_votes_weight, 4);
-    //colorWeightedMedianVote(color_map_votes, color_map_votes_weight, out_colors);
-    time_begin  = boost::posix_time::microsec_clock::local_time();
-    colorWeightedMeanVote(color_map_votes, color_map_votes_weight, out_colors);
-    // colorMedianVote(color_map_votes,out_colors);
-    time_diff = boost::posix_time::microsec_clock::local_time() - time_begin;
-    log(ALWAYS)<<"[SpaceTimeSampler] : Take weighted mean: "<<int(float(time_diff.total_milliseconds())/1000)<<" s"<<endLog();
-
-    //Compute old model for vector of edge color indices, to be used as input for some functions.
-    //For now, information is split between edge_indices and out_edge_color_ind (I think? Or something like that)
-    //Regular edge indices vector is computed at the end when reordering samples to save space. This is a temporary construct, so that we can correctly access color samples
-    std::vector<Vector3li> temp_edge_color_ind(out_edge_color_ind.size());
-    for(int tri=0;tri<triangles.size();++tri)
-    {
-        for(int e=0;e<3;++e)
-        {
-            if (out_edge_color_ind[tri](e)>=0)
-                temp_edge_color_ind[tri](e) = edge_indices[out_edge_color_ind[tri](e)];
-            else
-                temp_edge_color_ind[tri](e) = - edge_indices[- out_edge_color_ind[tri](e)];
-        }
-    }
-
-    // ****************************************************************************
-    // ***              2ND STEP - Filtering, post-processing                   ***
-    // ****************************************************************************
-    if (true)
-    {
-        log(ALWAYS)<<"[SpaceTimeSampler] : filtering colored mesh"<<endLog();
-
-        float sigma_s = 0.005f;
-        float sigma_c = 60.0f;
-        time_begin  = boost::posix_time::microsec_clock::local_time();
-
-        bleedColor(sigma_s, in_faces, in_points, out_colors, out_face_res, temp_edge_color_ind, out_face_color_ind);
-        // filterColoredMeshBilateral(sigma_s, sigma_c, in_faces, in_points, out_colors, out_face_res, temp_edge_color_ind, out_face_color_ind);
-        //filterColoredMeshLoG(0.0005f, 0.3, in_faces, in_points, out_colors, out_face_res, temp_edge_color_ind, out_face_color_ind);
-        
-
-
-        time_diff = boost::posix_time::microsec_clock::local_time() - time_begin;
-        log(ALWAYS)<<"[SpaceTimeSampler] : Color bleeding: "<<int(float(time_diff.total_milliseconds())/1000)<<" s"<<endLog();
-        log(ALWAYS)<<"[SpaceTimeSampler] : Filtering complete"<<endLog();
-        // colorTVNormVote(color_map_votes,color_map_votes_weight,/*adj_mat,*/samples_adj,out_colors);
-    }
-
-
-    //sharpenColor(3.0,out_colors,samples_adj);
-
-    // Downsampling part
-
-    //Update input mesh
-    in_mesh->setFacesVector(in_faces);
-    in_mesh->setPointsVector(in_points);
-    in_mesh->setColorsVector(out_colors);
-    in_mesh->setFacesResVector(out_face_res);
-    in_mesh->setEdgesIndVector(out_edge_color_ind);
-    in_mesh->setFacesIndVector(out_face_color_ind);
-    in_mesh->setEdgesRealColorInd(edge_indices);
-    //*/
-    // **********************************
-    // rearrange vertices/edges/triangles order to make image compression more efficient
-    // Stand-by for now: pain in the ass, and not really effective
-    // **********************************
-    float quantMatCoefs[] = {1,0.1,0.01};
-    
-    reIndexColors(in_mesh, default_face_res, quantMatCoefs, downsamplingThreshold);
-    
-    //The following lines is a necessary if reIndexColors is not run (I think?)
-    // out_edge_color_ind=temp_edge_color_ind;
-    // in_mesh->setEdgesIndVector(out_edge_color_ind);
-
-    // out_colors[0](0)=1;
-    //consistencyTest(out_colors,out_face_res,out_edge_color_ind,out_face_color_ind);
-
-    log(ALWAYS)<<"Cleaning Done. Kept "<<in_points.size()<<" points, and "<<in_faces.size()<<" faces."<<endLog();
-
     
 }
 
