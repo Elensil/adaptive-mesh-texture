@@ -46,7 +46,7 @@ typedef glm::dvec4   GLM_Vec4;
 
 #define IMG_WIDTH 2048
 #define IMG_HEIGHT 2048
-#define CLEANING_FACTOR 3.0
+#define CLEANING_FACTOR 2.0
 
 // --- Coloring parameters ---
 
