@@ -67,9 +67,6 @@ int main(int argc, char **argv)
             log(ALWAYS)<<"Generating file "<<colored_output_name<<endLog();
             mesh_to_be_cleaned.cleanAndColor(hyper_volume, fr, dst);
 
-            mesh_to_be_cleaned.exportAsMOFF(colored_output_name);
-            log(ALWAYS)<<"exported as "<<colored_output_name<<endLog();
-
         }
         else if(om.mode_ == 'Z')
         {
