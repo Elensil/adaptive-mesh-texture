@@ -8,7 +8,7 @@ cmake_minimum_required(VERSION 2.8)
         ADD_DEFINITIONS(-DUSE_EIGEN)
         INCLUDE_DIRECTORIES(${EIGEN3_INCLUDE_DIR})
 
-        FIND_PACKAGE(OpenCV 3.1 REQUIRED COMPONENTS opencv_core opencv_highgui opencv_imgproc opencv_ximgproc opencv_imgcodecs opencv_xfeatures2d tracking )
+        FIND_PACKAGE(OpenCV 3.1 REQUIRED COMPONENTS opencv_core opencv_highgui opencv_imgproc opencv_ximgproc opencv_imgcodecs )
         MESSAGE(STATUS "Using OpenCV 3.1")
         ADD_DEFINITIONS(-DBUILD_TIFF=ON )
         INCLUDE_DIRECTORIES(${OPENCV_INCLUDE_DIR})
