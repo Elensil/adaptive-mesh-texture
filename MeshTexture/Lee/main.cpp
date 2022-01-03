@@ -65,7 +65,7 @@ int main(int argc, char **argv)
             // }
 
             log(ALWAYS)<<"Generating file "<<colored_output_name<<endLog();
-            mesh_to_be_cleaned.cleanAndColor(hyper_volume, fr, dst);
+            mesh_to_be_cleaned.cleanAndColor(hyper_volume, fr, dst, frame+om.first_frame_);
 
         }
         else if(om.mode_ == 'Z')

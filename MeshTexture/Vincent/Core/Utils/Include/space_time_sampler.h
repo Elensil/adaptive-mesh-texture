@@ -61,7 +61,8 @@ public:
     template<class InTriangle = MyTriangle, class InPoint = Vector3f, class OutColor = Vector3ui, class MySpecialMesh>
     void colorPointCloud(MySpecialMesh *in_mesh,
                             int in_faceResParam,
-                            int in_downsamplingThreshold)const;
+                            int in_downsamplingThreshold,
+                            int frame)const;
 
     template<class InColor>
     float getColorDistance(const InColor &c1, const InColor &c2)const;
@@ -239,7 +240,8 @@ std::vector<size_t> SpaceTimeSampler::sort_indexes(const std::vector<T> &v) cons
 template<class InTriangle, class InPoint, class OutColor, class MySpecialMesh>
 void SpaceTimeSampler::colorPointCloud( MySpecialMesh *in_mesh,
                                         int in_faceResParam,
-                                        int in_downsamplingThreshold)const
+                                        int in_downsamplingThreshold,
+                                        int frame)const
 {
 
     log(ALWAYS)<<"[SpaceTimeSampler] : Starting Point Cloud cleaning and coloring..."<<endLog();
@@ -781,21 +783,21 @@ void SpaceTimeSampler::colorPointCloud( MySpecialMesh *in_mesh,
     }
     else
     {
-        int tr;
+        char filename[256] ;
         // std::vector<int> trValues = {512,1024, 1536, 2048,3072,4096,5120,6144,7168,8192};
         std::vector<int> trValues = {1024,2048,4096};
         for(int trInd = 0;trInd<trValues.size();++trInd)
         {
-            tr = trValues[trInd];
-            if (!boost::filesystem::exists(outputPath + "texture_" + std::to_string(tr) + ".png"))
+            const int tr = trValues[trInd];
+            sprintf(filename,"%stex%06d_%04d.png",outputPath.c_str(),frame,tr) ; // todo: better config?
+            if (!boost::filesystem::exists(filename))
             {
                 log(ALWAYS)<<"Generating texture map..."<<endLog();
                 log(ALWAYS)<<"In tex coords size: "<<in_tex_coords.size()<<endLog();
                 log(ALWAYS)<<"In tex indices size: "<<in_tex_indices.size()<<endLog();
-                int texRes=tr;
-                cv::Mat texMat = generateTextureMap(texRes, texRes, triangles, in_tex_coords, in_tex_indices, points, vertices_cam, camera_K, cam_tri_ind, outputPath);
-                cv::imwrite(outputPath + "texture_" + std::to_string(texRes) + ".png", texMat);
-                log(ALWAYS)<<"texture written ("<<texRes<<")"<<endLog();
+                cv::Mat texMat = generateTextureMap(tr, tr, triangles, in_tex_coords, in_tex_indices, points, vertices_cam, camera_K, cam_tri_ind, outputPath);
+                cv::imwrite(filename, texMat);
+                log(ALWAYS)<<"texture written ("<<tr<<") in "<<filename<<endLog();
             }
 
         }
@@ -2146,9 +2148,9 @@ cv::Mat SpaceTimeSampler::generateTextureMap(const unsigned int width, const uns
         x2 = tV2(1);   y2 = tV2(0);
         x3 = tV3(1);   y3 = tV3(0);
 
-        for(unsigned long int py = std::max(0.0,floor(sup_left(0))) ; py <= std::min(ceil(inf_right(0)),double(width-1)); ++py)
+        for(unsigned long int py = std::max(0.0f,floor(sup_left(0))) ; py <= std::min(ceil(inf_right(0)),float(width-1)); ++py)
         {
-            for(unsigned long int px = std::max(0.0,floor(sup_left(1))); px <= std::min(ceil(inf_right(1)),double(height-1)); ++px)
+            for(unsigned long int px = std::max(0.0f,floor(sup_left(1))); px <= std::min(ceil(inf_right(1)),float(height-1)); ++px)
             {
                 
                 x = (double)px;
@@ -2426,8 +2428,8 @@ void SpaceTimeSampler::setPixelsWhereTrianglesProjectCloser2(const std::vector<I
             inf_right(1) = edge2_coords(1);
 
         //Fill area if dist is inferior to already registered
-        for(unsigned long int py = std::max(0.0,floor(sup_left(0))) ; py < std::min(ceil(inf_right(0)),double(IMG_HEIGHT*cleaning_factor)); ++py)
-            for(unsigned long int px = std::max(0.0,floor(sup_left(1))); px < std::min(ceil(inf_right(1)),double(IMG_WIDTH*cleaning_factor)); ++px)
+        for(unsigned long int py = std::max(0.0f,floor(sup_left(0))) ; py < std::min(ceil(inf_right(0)),float(IMG_HEIGHT*cleaning_factor)); ++py)
+            for(unsigned long int px = std::max(0.0f,floor(sup_left(1))); px < std::min(ceil(inf_right(1)),float(IMG_WIDTH*cleaning_factor)); ++px)
             {
                 double x,y,x1,x2,x3,y1,y2,y3,lambda1,lambda2,depth1,depth2,depth3,previous_depth,new_depth;
                 x = (double)px;
@@ -2662,8 +2664,8 @@ void SpaceTimeSampler::setPixelsWhereTrianglesProjectCloserWConfidence(const std
             inf_right(1) = edge2_coords(1);
 
         //Fill area if dist is inferior to already registered
-        for(unsigned long int py = std::max(0.0,floor(sup_left(0))) ; py < std::min(ceil(inf_right(0)),double(IMG_HEIGHT*cleaning_factor)); ++py)
-            for(unsigned long int px = std::max(0.0,floor(sup_left(1))); px < std::min(ceil(inf_right(1)),double(IMG_WIDTH*cleaning_factor)); ++px)
+        for(unsigned long int py = std::max(0.0f,floor(sup_left(0))) ; py < std::min(ceil(inf_right(0)),float(IMG_HEIGHT*cleaning_factor)); ++py)
+            for(unsigned long int px = std::max(0.0f,floor(sup_left(1))); px < std::min(ceil(inf_right(1)),float(IMG_WIDTH*cleaning_factor)); ++px)
             {
                 double x,y,x1,x2,x3,y1,y2,y3,lambda1,lambda2,depth1,depth2,depth3,previous_depth,new_depth;
                 x = (double)px;

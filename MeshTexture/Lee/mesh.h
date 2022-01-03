@@ -35,7 +35,7 @@ public:
     /**  Cleaning */
 
     template<class PhotoUtils>
-    void cleanAndColor(const PhotoUtils *hyper_volume, int in_faceResParam = 8, int in_downsamplingThreshold = 0);
+    void cleanAndColor(const PhotoUtils *hyper_volume, int in_faceResParam = 8, int in_downsamplingThreshold = 0, int frame=0);
 
     template<class PhotoUtils>
     void compressColoredMesh(const PhotoUtils *hyper_volume, int quantFactor, float quantMatCoefs[]);
@@ -138,8 +138,8 @@ public:
 };
 
 template<class PhotoUtils>
-void MySpecialMesh::cleanAndColor(const PhotoUtils *hyper_volume, int in_faceResParam, int in_downsamplingThreshold){
-    hyper_volume->colorPointCloud(this, in_faceResParam, in_downsamplingThreshold);
+void MySpecialMesh::cleanAndColor(const PhotoUtils *hyper_volume, int in_faceResParam, int in_downsamplingThreshold, int frame){
+    hyper_volume->colorPointCloud(this, in_faceResParam, in_downsamplingThreshold, frame);
 }
 
 template<class PhotoUtils>
